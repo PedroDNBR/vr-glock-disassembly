@@ -1,0 +1,69 @@
+using Oculus.Interaction.GrabAPI;
+using Oculus.Interaction.HandGrab;
+using Oculus.Interaction.Input;
+using UnityEngine;
+
+/// <summary>
+/// Texto de depuração que flutua sobre a Glock com o modo de pegada de cada mão, a zona que a
+/// mão pegaria agora, o ângulo da palma em relação a uma zona escolhida e a força da pegada de
+/// palma dos dedos. Só para cenas de teste.
+/// </summary>
+[RequireComponent(typeof(TextMesh))]
+public class GlockGripDebugLabel : MonoBehaviour
+{
+    [SerializeField]
+    private GlockGripController _controller;
+
+    [Tooltip("Zona cujo ângulo de palma é mostrado (ex.: a de desmontagem).")]
+    [SerializeField]
+    private GlockGripZone _angleZone;
+
+    [SerializeField]
+    private Vector3 _offset = new Vector3(0f, 0.25f, 0f);
+
+    private TextMesh _text;
+
+    protected virtual void Awake()
+    {
+        _text = GetComponent<TextMesh>();
+    }
+
+    protected virtual void LateUpdate()
+    {
+        transform.position = _controller.transform.position + _offset;
+
+        Camera view = Camera.main;
+        if (view != null)
+        {
+            transform.rotation = Quaternion.LookRotation(transform.position - view.transform.position);
+        }
+
+        _text.text = Line(Handedness.Left, "E") + "\n" + Line(Handedness.Right, "D");
+    }
+
+    private string Line(Handedness hand, string label)
+    {
+        string line = label + ": " + _controller.GetMode(hand);
+        HandGrabInteractor interactor = _controller.GetInteractor(hand);
+        if (interactor == null)
+        {
+            if (!_controller.TryGetCandidate(hand, out interactor, out GlockGripZone zone))
+            {
+                return line;
+            }
+
+            line += "  | mira: " + (zone != null ? zone.Mode.ToString() : "-");
+            if (_angleZone != null)
+            {
+                line += "  | " + _angleZone.Mode + " " + _angleZone.PalmAngle(interactor).ToString("F0") + "°";
+            }
+        }
+
+        // Força da pegada de palma de médio, anelar e mínimo (pega acima do início, solta abaixo da soltura).
+        HandGrabAPI api = interactor.HandGrabApi;
+        line += "  | M/A/m " + api.GetFingerPalmStrength(HandFinger.Middle).ToString("F2")
+            + " " + api.GetFingerPalmStrength(HandFinger.Ring).ToString("F2")
+            + " " + api.GetFingerPalmStrength(HandFinger.Pinky).ToString("F2");
+        return line;
+    }
+}
