@@ -1080,6 +1080,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GlockGripDebugLabel
   _controller: {fileID: 2030257673}
   _angleZone: {fileID: 2030257672}
+  _trigger: {fileID: 2030257674}
   _offset: {x: 0, y: 0.25, z: 0}
 --- !u!102 &2002934691
 TextMesh:
@@ -1248,6 +1249,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 11c414e906861584d99f8a7259a65d25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlockGripController
+--- !u!114 &2030257674 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1320330391134214204, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+  m_PrefabInstance: {fileID: 2030257671}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8d4861772819464fb0f01190a7a6f27, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockTrigger
 --- !u!1 &2034940743
 GameObject:
   m_ObjectHideFlags: 0

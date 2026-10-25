@@ -18,6 +18,10 @@ public class GlockGripDebugLabel : MonoBehaviour
     [SerializeField]
     private GlockGripZone _angleZone;
 
+    [Tooltip("Opcional: mostra o curso do gatilho e o estado do percussor.")]
+    [SerializeField]
+    private GlockTrigger _trigger;
+
     [SerializeField]
     private Vector3 _offset = new Vector3(0f, 0.25f, 0f);
 
@@ -38,7 +42,14 @@ public class GlockGripDebugLabel : MonoBehaviour
             transform.rotation = Quaternion.LookRotation(transform.position - view.transform.position);
         }
 
-        _text.text = Line(Handedness.Left, "E") + "\n" + Line(Handedness.Right, "D");
+        string text = Line(Handedness.Left, "E") + "\n" + Line(Handedness.Right, "D");
+        if (_trigger != null)
+        {
+            text += "\nGatilho " + _trigger.Pull.ToString("F2") + "  | percussor "
+                + (_trigger.IsCocked ? "armado" : "disparado");
+        }
+
+        _text.text = text;
     }
 
     private string Line(Handedness hand, string label)

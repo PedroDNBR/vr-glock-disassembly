@@ -3669,6 +3669,7 @@ GameObject:
   - component: {fileID: 2292937298463312028}
   - component: {fileID: 585223612371153805}
   - component: {fileID: 6333158740517992089}
+  - component: {fileID: 1320330391134214204}
   m_Layer: 0
   m_Name: Glock
   m_TagString: Untagged
@@ -3834,6 +3835,30 @@ MonoBehaviour:
   - {fileID: 3069869327601000744}
   - {fileID: 5490718443135824035}
   - {fileID: 986358202495840655}
+--- !u!114 &1320330391134214204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7956342098172198959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8d4861772819464fb0f01190a7a6f27, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockTrigger
+  _grip: {fileID: 6333158740517992089}
+  _triggerPivot: {fileID: 2006505979067981611}
+  _safetyPivot: {fileID: 3610778860396457200}
+  _slide: {fileID: 6321847785661317992}
+  _triggerAngle: 12
+  _safetyAngle: 10
+  _safetyTravel: 0.15
+  _inputRange: {x: 0.05, y: 0.95}
+  _speed: 12
+  _breakPoint: 0.9
+  _cockTravel: 0.02
+  _startCocked: 1
 --- !u!1 &8172613384688667661
 GameObject:
   m_ObjectHideFlags: 0
