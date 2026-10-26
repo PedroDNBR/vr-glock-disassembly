@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// Texto de depuração que flutua sobre a Glock com o modo de pegada de cada mão, a zona que a
-/// mão pegaria agora, o ângulo da palma em relação a uma zona escolhida e a força da pegada de
+/// mão pegaria agora, o ângulo da mão em relação a uma zona escolhida e a força da pegada de
 /// palma dos dedos. Só para cenas de teste.
 /// </summary>
 [RequireComponent(typeof(TextMesh))]
@@ -14,13 +14,48 @@ public class GlockGripDebugLabel : MonoBehaviour
     [SerializeField]
     private GlockGripController _controller;
 
-    [Tooltip("Zona cujo ângulo de palma é mostrado (ex.: a de desmontagem).")]
+    [Tooltip("Zona cujo ângulo de aceitação (palma ou dedos) é mostrado, ex.: a de desmontagem.")]
     [SerializeField]
     private GlockGripZone _angleZone;
 
     [Tooltip("Opcional: mostra o curso do gatilho e o estado do percussor.")]
     [SerializeField]
     private GlockTrigger _trigger;
+
+    [Tooltip("Opcional: mostra o curso do ferrolho e quantas vezes ele foi manobrado.")]
+    [SerializeField]
+    private GlockSlide _slide;
+
+    [Tooltip("Opcional: mostra se o retém está segurando o ferrolho aberto.")]
+    [SerializeField]
+    private GlockSlideStop _slideStop;
+
+    [Tooltip("Opcional: mostra o estado do carregador.")]
+    [SerializeField]
+    private GlockMagazine _magazine;
+
+    private int _racks;
+
+    protected virtual void OnEnable()
+    {
+        if (_slide != null)
+        {
+            _slide.WhenRacked += HandleRacked;
+        }
+    }
+
+    protected virtual void OnDisable()
+    {
+        if (_slide != null)
+        {
+            _slide.WhenRacked -= HandleRacked;
+        }
+    }
+
+    private void HandleRacked()
+    {
+        _racks++;
+    }
 
     [SerializeField]
     private Vector3 _offset = new Vector3(0f, 0.25f, 0f);
@@ -49,6 +84,21 @@ public class GlockGripDebugLabel : MonoBehaviour
                 + (_trigger.IsCocked ? "armado" : "disparado");
         }
 
+        if (_slide != null)
+        {
+            text += "\nFerrolho " + _slide.Travel01.ToString("F2") + "  | manobras " + _racks;
+            if (_slideStop != null)
+            {
+                text += "  | " + (_slideStop.IsLocked ? "travado aberto" : "livre");
+            }
+        }
+
+        if (_magazine != null)
+        {
+            text += "\nCarregador " + (_magazine.State == GlockMagazine.MagazineState.Seated ? "inserido"
+                : _magazine.State == GlockMagazine.MagazineState.InWell ? "no poço" : "fora");
+        }
+
         _text.text = text;
     }
 
@@ -66,7 +116,7 @@ public class GlockGripDebugLabel : MonoBehaviour
             line += "  | mira: " + (zone != null ? zone.Mode.ToString() : "-");
             if (_angleZone != null)
             {
-                line += "  | " + _angleZone.Mode + " " + _angleZone.PalmAngle(interactor).ToString("F0") + "°";
+                line += "  | " + _angleZone.Mode + " " + _angleZone.HandAngle(interactor).ToString("F0") + "°";
             }
         }
 

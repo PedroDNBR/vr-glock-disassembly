@@ -24,10 +24,6 @@ public class GlockTrigger : MonoBehaviour
     [SerializeField]
     private Transform _safetyPivot;
 
-    [Tooltip("Ferrolho. Recuar além de Cock Travel arma o percussor (provisório até a D1).")]
-    [SerializeField]
-    private Transform _slide;
-
     [Header("Curso")]
     [Tooltip("Rotação do gatilho no fim do curso, em graus, no X local do pivô (positivo leva a sapata para trás).")]
     [SerializeField]
@@ -54,10 +50,6 @@ public class GlockTrigger : MonoBehaviour
     [SerializeField, Range(0f, 1f)]
     private float _breakPoint = 0.9f;
 
-    [Tooltip("Recuo do ferrolho, em metros, que arma o percussor.")]
-    [SerializeField, Min(0f)]
-    private float _cockTravel = 0.02f;
-
     [SerializeField]
     private bool _startCocked = true;
 
@@ -74,27 +66,16 @@ public class GlockTrigger : MonoBehaviour
 
     private Quaternion _triggerRest;
     private Quaternion _safetyRest;
-    private float _slideRestZ;
 
     protected virtual void Awake()
     {
         _triggerRest = _triggerPivot.localRotation;
         _safetyRest = _safetyPivot.localRotation;
-        if (_slide != null)
-        {
-            _slideRestZ = _slide.localPosition.z;
-        }
-
         IsCocked = _startCocked;
     }
 
     protected virtual void Update()
     {
-        if (_slide != null && _slideRestZ - _slide.localPosition.z >= _cockTravel)
-        {
-            Cock();
-        }
-
         // Com o percussor solto, o gatilho fica atrás até o ferrolho ser manobrado.
         float target = IsCocked ? ReadInput() : 1f;
         Pull = Mathf.MoveTowards(Pull, target, _speed * Time.deltaTime);
@@ -111,7 +92,7 @@ public class GlockTrigger : MonoBehaviour
         _triggerPivot.localRotation = _triggerRest * Quaternion.Euler(trigger * _triggerAngle, 0f, 0f);
     }
 
-    /// <summary>Arma o percussor. Chamado quando o ferrolho é manobrado.</summary>
+    /// <summary>Arma o percussor. Chamado pelo <see cref="GlockSlide"/> quando o ferrolho é manobrado.</summary>
     public void Cock()
     {
         if (IsCocked)

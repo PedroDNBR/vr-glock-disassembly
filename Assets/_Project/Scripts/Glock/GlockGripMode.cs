@@ -22,6 +22,9 @@ public enum GlockGripMode
 
     /// <summary>Qualquer outro ponto da arma: pega livre, mantendo a pose atual.</summary>
     Free,
+
+    /// <summary>Segurando o carregador, fora da arma ou correndo no poço.</summary>
+    Magazine,
 }
 
 public static class GlockGripModes
@@ -35,5 +38,14 @@ public static class GlockGripModes
             || mode == GlockGripMode.Takedown
             || mode == GlockGripMode.SlideFree
             || mode == GlockGripMode.Free;
+    }
+
+    /// <summary>
+    /// Modos que só fazem sentido com a outra mão segurando a arma (uma peça móvel dela).
+    /// </summary>
+    public static bool DependsOnGun(GlockGripMode mode)
+    {
+        return mode == GlockGripMode.SlideDrag
+            || mode == GlockGripMode.Lever;
     }
 }

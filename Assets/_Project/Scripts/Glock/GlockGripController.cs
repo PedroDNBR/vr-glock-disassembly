@@ -9,7 +9,8 @@ using UnityEngine;
 ///
 /// Regras entre as mãos:
 /// - pegar o corpo da arma com uma mão solta a outra, se ela também segurava o corpo (troca de mão);
-/// - soltar o corpo da arma solta também a mão que segurava uma peça móvel (ferrolho, alavanca).
+/// - soltar o corpo da arma solta também a mão que segurava uma peça móvel (ferrolho, alavanca);
+///   o carregador não conta, porque ele sai da arma.
 /// </summary>
 [DisallowMultipleComponent]
 public class GlockGripController : MonoBehaviour
@@ -149,7 +150,7 @@ public class GlockGripController : MonoBehaviour
         SetZone(index, null, null);
 
         HandSlot other = _hands[1 - index];
-        if (zone.HoldsGun && other.Zone != null && !other.Zone.HoldsGun)
+        if (zone.HoldsGun && other.Zone != null && GlockGripModes.DependsOnGun(other.Zone.Mode))
         {
             other.Interactor.ForceRelease();
         }

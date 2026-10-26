@@ -2,6 +2,7 @@ using Oculus.Interaction;
 using Oculus.Interaction.HandGrab;
 using Oculus.Interaction.Input;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Uma zona de pegada da Glock: um volume próprio (os colliders do seu Rigidbody), os
@@ -19,6 +20,16 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
         Any,
         MustHoldGun,
         MustNotHoldGun,
+    }
+
+    /// <summary>Eixo da mão comparado no ângulo de aceitação.</summary>
+    public enum HandAxis
+    {
+        /// <summary>Para onde a palma aponta.</summary>
+        Palm,
+
+        /// <summary>Para onde os dedos apontam (do pulso para os nós dos dedos).</summary>
+        Fingers,
     }
 
     [SerializeField]
@@ -47,9 +58,12 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
     [SerializeField]
     private bool _checkAngle;
 
-    [Tooltip("Para onde a palma deve apontar, no espaço local desta zona.")]
     [SerializeField]
-    private Vector3 _palmDirection = Vector3.down;
+    private HandAxis _angleAxis = HandAxis.Palm;
+
+    [Tooltip("Para onde o eixo da mão deve apontar, no espaço local desta zona.")]
+    [SerializeField, FormerlySerializedAs("_palmDirection")]
+    private Vector3 _axisDirection = Vector3.down;
 
     [SerializeField, Range(0f, 180f)]
     private float _maxAngle = 60f;
@@ -114,13 +128,13 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
             return false;
         }
 
-        return !_checkAngle || PalmAngle(interactor) <= _maxAngle;
+        return !_checkAngle || HandAngle(interactor) <= _maxAngle;
     }
 
     /// <summary>
-    /// Ângulo, em graus, entre a normal da palma e a direção esperada desta zona.
+    /// Ângulo, em graus, entre o eixo da mão (palma ou dedos) e a direção esperada desta zona.
     /// </summary>
-    public float PalmAngle(HandGrabInteractor interactor)
+    public float HandAngle(HandGrabInteractor interactor)
     {
         IHand hand = interactor.Hand;
         if (hand == null || !hand.GetRootPose(out Pose wrist))
@@ -128,8 +142,11 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
             return 180f;
         }
 
-        Vector3 palmar = hand.Handedness == Handedness.Left ? Constants.LeftPalmar : Constants.RightPalmar;
-        return Vector3.Angle(wrist.rotation * palmar, transform.TransformDirection(_palmDirection));
+        bool left = hand.Handedness == Handedness.Left;
+        Vector3 axis = _angleAxis == HandAxis.Fingers
+            ? (left ? Constants.LeftDistal : Constants.RightDistal)
+            : (left ? Constants.LeftPalmar : Constants.RightPalmar);
+        return Vector3.Angle(wrist.rotation * axis, transform.TransformDirection(_axisDirection));
     }
 
     private static Vector3 PalmPosition(HandGrabInteractor interactor)
@@ -182,10 +199,11 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
         _otherHand = otherHand;
     }
 
-    public void InjectOptionalAngle(Vector3 palmDirection, float maxAngle)
+    public void InjectOptionalAngle(HandAxis axis, Vector3 direction, float maxAngle)
     {
         _checkAngle = true;
-        _palmDirection = palmDirection;
+        _angleAxis = axis;
+        _axisDirection = direction;
         _maxAngle = maxAngle;
     }
 

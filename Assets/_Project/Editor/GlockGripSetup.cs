@@ -24,6 +24,9 @@ internal static class GlockGripSetup
     private const float GripAngle = 20f;
     private const float SlideTravel = 0.045f;
 
+    // O carregador é inclinado como o cabo: 19° da vertical, com o topo para a frente.
+    private const float MagazineAngle = 19f;
+
     private struct Box
     {
         public Vector3 Center;
@@ -175,7 +178,7 @@ internal static class GlockGripSetup
         gunData.FindProperty("_throwWhenUnselected").boolValue = true;
         gunData.ApplyModifiedPropertiesWithoutUndo();
 
-        // Provisório até a D1: o ferrolho corre só em Z local, entre a posição de repouso e o fim do curso.
+        // O ferrolho corre só em Z local. Em jogo, o GlockSlide refaz esse limite a partir do curso dele.
         var slideTranslate = GetOrAdd<OneGrabTranslateTransformer>(slide.gameObject);
         Vector3 slideRest = slide.localPosition;
         LockTranslation(slideTranslate, slideRest, new Vector2(slideRest.z - SlideTravel, slideRest.z));
@@ -195,8 +198,10 @@ internal static class GlockGripSetup
         // editor com a mão fantasma (o builder não mexe numa pose que já existe).
         var handleWrist = new WristPose(new Vector3(0.03f, 0.096f, -0.13f),
             new Vector3(0f, -0.34f, 0.94f), Vector3.right);
-        var takedownWrist = new WristPose(new Vector3(0.0575f, 0.1645f, -0.072f),
-            new Vector3(-0.95f, -0.19f, 0.24f), Vector3.up);
+        // Desmontagem: palma no lado do ferrolho, dedos para cima abraçando o ferrolho e polegar
+        // indo para trás, até o beavertail.
+        var takedownWrist = new WristPose(new Vector3(0.032f, 0.063f, -0.067f),
+            new Vector3(0f, 1f, 0.15f), Vector3.right);
 
         var all = new List<GlockGripZone>
         {
@@ -206,7 +211,7 @@ internal static class GlockGripSetup
 
             Zone(root, zones, "Zone_Takedown", controller, gun, GlockGripMode.Takedown, 40,
                 GlockGripZone.OtherHandRule.MustNotHoldGun, takedownWrist,
-                new Box(new Vector3(0f, 0.155f, -0.06f), new Vector3(0.09f, 0.07f, 0.12f))),
+                new Box(new Vector3(0f, 0.125f, -0.06f), new Vector3(0.1f, 0.08f, 0.11f))),
 
             Zone(root, zones, "Zone_SlideFree", controller, gun, GlockGripMode.SlideFree, 30,
                 GlockGripZone.OtherHandRule.MustNotHoldGun, null,
@@ -226,8 +231,11 @@ internal static class GlockGripSetup
                 new Box(new Vector3(0f, 0.075f, -0.005f), new Vector3(0.1f, 0.19f, 0.25f))),
         };
 
-        // Pegada de desmontagem: palma virada para baixo, sobre o ferrolho.
-        all[1].InjectOptionalAngle(Vector3.down, 55f);
+        all.Add(BuildMagazine(root, controller));
+
+        // Pegada de desmontagem: dedos para cima, abraçando o ferrolho. Na empunhadura eles apontam
+        // para a frente, então o ângulo separa as duas mesmo com os volumes se tocando.
+        all[1].InjectOptionalAngle(GlockGripZone.HandAxis.Fingers, Vector3.up, 50f);
 
         SerializedObject controllerData = new SerializedObject(controller);
         SerializedProperty zoneList = controllerData.FindProperty("_zones");
@@ -238,6 +246,70 @@ internal static class GlockGripSetup
         }
 
         controllerData.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    /// <summary>
+    /// Carregador removível: eixo do poço, corpo com física, pegada própria (o
+    /// <see cref="GlockMagazine"/> é o transformer) e uma zona de pegada com prioridade alta.
+    /// </summary>
+    private static GlockGripZone BuildMagazine(Transform root, GlockGripController controller)
+    {
+        Transform axis = Child(root, "MagwellAxis");
+        Transform magazine = axis.Find("Magazine");
+        if (magazine == null)
+        {
+            // O eixo nasce na posição do carregador inserido, inclinado como ele.
+            magazine = root.Find("Magazine");
+            axis.SetPositionAndRotation(magazine.position, root.rotation * Quaternion.Euler(MagazineAngle, 0f, 0f));
+            magazine.SetParent(axis, true);
+        }
+
+        Rigidbody body = GetOrAdd<Rigidbody>(magazine.gameObject);
+        body.mass = 0.08f;
+        body.isKinematic = true;
+        // Sem interpolação dentro da arma; o GlockMagazine liga quando ele fica solto.
+        body.interpolation = RigidbodyInterpolation.None;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+        // Corpo do carregador alinhado com o eixo do poço (medidas no espaço da raiz da arma).
+        Transform colliderOwner = Child(magazine, "MagazineCollider");
+        SetBoxes(colliderOwner, false,
+            new Box(colliderOwner.InverseTransformPoint(root.TransformPoint(new Vector3(0f, 0.0595f, -0.059f))),
+                new Vector3(0.022f, 0.126f, 0.034f), new Vector3(MagazineAngle, 0f, 0f)));
+
+        GlockMagazine magazineLogic = GetOrAdd<GlockMagazine>(magazine.gameObject);
+        Grabbable grabbable = SetupGrabbable(magazine, body, magazineLogic);
+        SerializedObject grabData = new SerializedObject(grabbable);
+        grabData.FindProperty("_kinematicWhileSelected").boolValue = true;
+        grabData.FindProperty("_throwWhenUnselected").boolValue = true;
+        grabData.ApplyModifiedPropertiesWithoutUndo();
+
+        GlockGripZone zone = GetOrAdd<GlockGripZone>(magazine.gameObject);
+        HandGrabInteractable interactable = Grab(magazine, body, grabbable, zone, HandAlignType.None);
+        zone.InjectAllGlockGripZone(controller, new[] { interactable }, GlockGripMode.Magazine, 60,
+            GlockGripZone.OtherHandRule.Any);
+        EditorUtility.SetDirty(zone);
+
+        var gunColliders = new List<Collider>(root.Find("PhysicsColliders").GetComponentsInChildren<Collider>(true));
+        gunColliders.AddRange(root.Find("SlideGroup/SlideCollider").GetComponentsInChildren<Collider>(true));
+
+        SerializedObject data = new SerializedObject(magazineLogic);
+        data.FindProperty("_grip").objectReferenceValue = controller;
+        data.FindProperty("_slideStop").objectReferenceValue = root.GetComponent<GlockSlideStop>();
+        data.FindProperty("_wellAxis").objectReferenceValue = axis;
+        data.FindProperty("_rigidbody").objectReferenceValue = body;
+        data.FindProperty("_interactable").objectReferenceValue = interactable;
+        data.FindProperty("_zone").objectReferenceValue = zone;
+        data.FindProperty("_releaseButton").objectReferenceValue = root.Find("MagReleasePivot");
+        SerializedProperty colliders = data.FindProperty("_gunColliders");
+        colliders.arraySize = gunColliders.Count;
+        for (int i = 0; i < gunColliders.Count; i++)
+        {
+            colliders.GetArrayElementAtIndex(i).objectReferenceValue = gunColliders[i];
+        }
+
+        data.ApplyModifiedPropertiesWithoutUndo();
+        return zone;
     }
 
     private static Grabbable SetupGrabbable(Transform target, Rigidbody body, ITransformer transformer)

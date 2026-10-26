@@ -470,6 +470,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &484072278 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1331641860255135196, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+  m_PrefabInstance: {fileID: 2030257671}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fa93dd72ade48242928b6bd5a93fbae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockMagazine
 --- !u!1001 &540291866
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1081,6 +1092,9 @@ MonoBehaviour:
   _controller: {fileID: 2030257673}
   _angleZone: {fileID: 2030257672}
   _trigger: {fileID: 2030257674}
+  _slide: {fileID: 2030257675}
+  _slideStop: {fileID: 2030257676}
+  _magazine: {fileID: 484072278}
   _offset: {x: 0, y: 0.25, z: 0}
 --- !u!102 &2002934691
 TextMesh:
@@ -1218,6 +1232,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6832471590900202965, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+      propertyPath: _emptyMagazineInserted
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7956342098172198959, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
       propertyPath: m_Name
       value: Glock
@@ -1260,6 +1278,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8d4861772819464fb0f01190a7a6f27, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlockTrigger
+--- !u!114 &2030257675 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7180726761610180018, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+  m_PrefabInstance: {fileID: 2030257671}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f597c97915c9f98478be290bcf2d977b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockSlide
+--- !u!114 &2030257676 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6832471590900202965, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+  m_PrefabInstance: {fileID: 2030257671}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a45c1bbc53c10d4fb31a0ae909bee13, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockSlideStop
 --- !u!1 &2034940743
 GameObject:
   m_ObjectHideFlags: 0
