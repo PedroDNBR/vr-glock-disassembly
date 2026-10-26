@@ -23,6 +23,9 @@ internal static class GlockGripSetup
     // Medidas no espaço local da raiz da Glock (metros, cano em +Z).
     private const float GripAngle = 20f;
 
+    // Folga do volume de pegada das peças de dentro do ferrolho (mola e cano), em cada lado.
+    private const float PartGrabMargin = 0.03f;
+
     // O carregador é inclinado como o cabo: 19° da vertical, com o topo para a frente.
     private const float MagazineAngle = 19f;
 
@@ -211,8 +214,9 @@ internal static class GlockGripSetup
                 GlockGripZone.OtherHandRule.Any, handleWrist,
                 new Box(new Vector3(0f, 0.0534f, -0.075f), new Vector3(0.09f, 0.12f, 0.092f), new Vector3(GripAngle, 0f, 0f))),
 
+            // Aceita a outra mão numa pegada livre (segurando a arma pela ponta): ao pegar aqui ela é solta.
             Zone(root, zones, "Zone_Takedown", controller, gun, GlockGripMode.Takedown, 40,
-                GlockGripZone.OtherHandRule.MustNotHoldGun, takedownWrist,
+                GlockGripZone.OtherHandRule.MustNotHoldGunExceptFree, takedownWrist,
                 new Box(new Vector3(0f, 0.125f, -0.06f), new Vector3(0.1f, 0.08f, 0.11f))),
 
             Zone(root, zones, "Zone_SlideFree", controller, gun, GlockGripMode.SlideFree, 30,
@@ -234,6 +238,18 @@ internal static class GlockGripSetup
         };
 
         all.Add(BuildMagazine(root, controller));
+
+        // Peças de dentro do ferrolho (D8/D9). A mola, como na Glock: empurrada contra a frente do
+        // ferrolho, inclinada em torno da ponta da frente (a traseira sai por baixo) e puxada para trás
+        // e para fora. O cano, só depois da mola, faz o mesmo: inclina em torno da boca (a culatra sai
+        // primeiro) e é puxado para trás e para fora. Direções no espaço da raiz
+        // da arma (igual ao do ferrolho); caixas e pivô saem das malhas, então acompanham um reexport.
+        GlockSlidePart spring = BuildSlidePart(root, controller, root.Find("RecoilSpringAssembly"), 45,
+            new Vector3(0f, -0.6f, -0.8f), 0.025f, null, 0.003f, 15f);
+        GlockSlidePart barrel = BuildSlidePart(root, controller, root.Find("BarrelDriver"), 40,
+            new Vector3(0f, -0.35f, -0.94f), 0.035f, spring, 0f, 10f);
+        all.Add(spring.GetComponent<GlockGripZone>());
+        all.Add(barrel.GetComponent<GlockGripZone>());
 
         // Pegada de desmontagem: dedos para cima, abraçando o ferrolho. Na empunhadura eles apontam
         // para a frente, então o ângulo separa as duas mesmo com os volumes se tocando.
@@ -312,6 +328,96 @@ internal static class GlockGripSetup
 
         data.ApplyModifiedPropertiesWithoutUndo();
         return zone;
+    }
+
+    /// <summary>
+    /// Peça que sai do ferrolho desmontado: corpo, collider, pegada própria (o
+    /// <see cref="GlockSlidePart"/> é o transformer) e uma zona de pegada de peça solta.
+    /// </summary>
+    private static GlockSlidePart BuildSlidePart(Transform root, GlockGripController controller, Transform part,
+        int priority, Vector3 exitDirection, float exitTravel, GlockSlidePart requires, float compressTravel,
+        float tiltAngle)
+    {
+        Box rootBox = MeshBox(root, part, 0.001f);
+        // Pivô da inclinação: a ponta da frente da peça, no eixo dela.
+        Vector3 frontTip = part.InverseTransformPoint(root.TransformPoint(
+            rootBox.Center + Vector3.forward * (rootBox.Size.z * 0.5f)));
+        Rigidbody body = GetOrAdd<Rigidbody>(part.gameObject);
+        body.mass = 0.05f;
+        body.isKinematic = true;
+        body.interpolation = RigidbodyInterpolation.None;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+        Transform colliderOwner = Child(part, "PartCollider");
+        SetBoxes(colliderOwner, false, new Box(colliderOwner.InverseTransformPoint(root.TransformPoint(rootBox.Center)),
+            rootBox.Size));
+
+        // Volume de pegada maior que a peça: ela fica dentro do ferrolho e a palma não chega perto
+        // dela (a mão entra com os dedos por baixo do ferrolho).
+        Transform grabOwner = Child(part, "GrabVolume");
+        SetBoxes(grabOwner, true, new Box(grabOwner.InverseTransformPoint(root.TransformPoint(rootBox.Center)),
+            rootBox.Size + Vector3.one * (2f * PartGrabMargin)));
+
+        GlockSlidePart logic = GetOrAdd<GlockSlidePart>(part.gameObject);
+        Grabbable grabbable = SetupGrabbable(part, body, logic);
+        SerializedObject grabData = new SerializedObject(grabbable);
+        grabData.FindProperty("_kinematicWhileSelected").boolValue = true;
+        grabData.FindProperty("_throwWhenUnselected").boolValue = true;
+        grabData.ApplyModifiedPropertiesWithoutUndo();
+
+        GlockGripZone zone = GetOrAdd<GlockGripZone>(part.gameObject);
+        HandGrabInteractable interactable = Grab(part, body, grabbable, zone, HandAlignType.None);
+        zone.InjectAllGlockGripZone(controller, new[] { interactable }, GlockGripMode.Part, priority,
+            GlockGripZone.OtherHandRule.Any);
+        EditorUtility.SetDirty(zone);
+
+        SerializedObject data = new SerializedObject(logic);
+        data.FindProperty("_slide").objectReferenceValue = root.GetComponent<GlockSlide>();
+        data.FindProperty("_grabbable").objectReferenceValue = grabbable;
+        data.FindProperty("_rigidbody").objectReferenceValue = body;
+        data.FindProperty("_zone").objectReferenceValue = zone;
+        data.FindProperty("_exitDirection").vector3Value = exitDirection;
+        data.FindProperty("_exitTravel").floatValue = exitTravel;
+        data.FindProperty("_compressTravel").floatValue = compressTravel;
+        data.FindProperty("_tiltAngle").floatValue = tiltAngle;
+        data.FindProperty("_tiltPivot").vector3Value = frontTip;
+        SerializedProperty requirements = data.FindProperty("_requires");
+        requirements.arraySize = requires != null ? 1 : 0;
+        if (requires != null)
+        {
+            requirements.GetArrayElementAtIndex(0).objectReferenceValue = requires;
+        }
+
+        data.ApplyModifiedPropertiesWithoutUndo();
+        return logic;
+    }
+
+    /// <summary>
+    /// Caixa que envolve as malhas de <paramref name="part"/>, no espaço da raiz da arma, com uma
+    /// folga em volta.
+    /// </summary>
+    private static Box MeshBox(Transform root, Transform part, float margin)
+    {
+        var bounds = new Bounds();
+        bool first = true;
+        foreach (MeshFilter filter in part.GetComponentsInChildren<MeshFilter>(true))
+        {
+            foreach (Vector3 vertex in filter.sharedMesh.vertices)
+            {
+                Vector3 point = root.InverseTransformPoint(filter.transform.TransformPoint(vertex));
+                if (first)
+                {
+                    bounds = new Bounds(point, Vector3.zero);
+                    first = false;
+                }
+                else
+                {
+                    bounds.Encapsulate(point);
+                }
+            }
+        }
+
+        return new Box(bounds.center, bounds.size + Vector3.one * (2f * margin));
     }
 
     private static Grabbable SetupGrabbable(Transform target, Rigidbody body, ITransformer transformer)
@@ -453,7 +559,9 @@ internal static class GlockGripSetup
     }
 
     /// <summary>
-    /// Troca os filhos "Volume_N" de <paramref name="owner"/> por novos BoxColliders.
+    /// Troca os filhos "Volume_N" de <paramref name="owner"/> por novos BoxColliders. Como eles são
+    /// recriados a cada execução, referências serializadas a eles quebram: quem precisa deles em jogo
+    /// deve procurá-los em tempo de execução (ou ser preenchido por este builder na mesma execução).
     /// </summary>
     private static void SetBoxes(Transform owner, bool isTrigger, params Box[] boxes)
     {

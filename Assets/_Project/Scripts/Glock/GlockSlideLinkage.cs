@@ -55,10 +55,6 @@ public class GlockSlideLinkage : MonoBehaviour
     [SerializeField]
     private float _slideFrontZ = 0.092f;
 
-    [Header("Mola")]
-    [Tooltip("Comprimento da mola interna montada, em metros (da flange da guia até a frente da luva).")]
-    [SerializeField, Min(0.001f)]
-    private float _innerSpringLength = 0.0819f;
 
     private bool _initialized;
     private Vector3 _barrelRest;
@@ -66,6 +62,7 @@ public class GlockSlideLinkage : MonoBehaviour
     private Vector3 _sleeveRest;
     private Vector3 _springAssemblyRest;
     private Vector3 _innerSpringRestScale;
+    private float _innerSpringLength;
 
     protected virtual void Awake()
     {
@@ -143,5 +140,31 @@ public class GlockSlideLinkage : MonoBehaviour
         _sleeveRest = _outerSleeve.localPosition;
         _springAssemblyRest = _springAssembly.localPosition;
         _innerSpringRestScale = _innerSpring.localScale;
+        _innerSpringLength = MeasureLength(_innerSpring);
+    }
+
+    /// <summary>
+    /// Comprimento das malhas de <paramref name="part"/> em Z, no espaço do pai dela (o eixo da
+    /// mola). Medido das malhas para acompanhar um reexport do FBX. Usa os bounds da malha, e não
+    /// os vértices, porque no Quest a malha não tem Read/Write ligado.
+    /// </summary>
+    private static float MeasureLength(Transform part)
+    {
+        float min = float.PositiveInfinity;
+        float max = float.NegativeInfinity;
+        foreach (MeshFilter filter in part.GetComponentsInChildren<MeshFilter>(true))
+        {
+            Bounds bounds = filter.sharedMesh.bounds;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = bounds.center + Vector3.Scale(bounds.extents,
+                    new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f));
+                float z = part.parent.InverseTransformPoint(filter.transform.TransformPoint(corner)).z;
+                min = Mathf.Min(min, z);
+                max = Mathf.Max(max, z);
+            }
+        }
+
+        return Mathf.Max(0.001f, max - min);
     }
 }

@@ -26,6 +26,10 @@ public class GlockTakedownLever : MonoBehaviour
     [SerializeField]
     private Transform _lever;
 
+    [Tooltip("Opcional: zona de pegada da alavanca. Bloqueada enquanto a alavanca está presa pelo ferrolho, para a mão pegar o ferrolho e não a alavanca.")]
+    [SerializeField]
+    private GlockGripZone _zone;
+
     [Tooltip("Quanto a alavanca desce, em metros.")]
     [SerializeField, Min(0f)]
     private float _travel = 0.0025f;
@@ -52,7 +56,7 @@ public class GlockTakedownLever : MonoBehaviour
 
     [Tooltip("Hand tracking: caixa de toque na ponta da alavanca do lado +X, no espaço da arma (aparece no Scene com o componente selecionado). O lado −X é espelhado.")]
     [SerializeField]
-    private Bounds _touchBox = new Bounds(new Vector3(0.018f, 0.106f, 0.0042f), new Vector3(0.016f, 0.014f, 0.016f));
+    private Bounds _touchBox = new Bounds(new Vector3(0.022f, 0.104f, 0.004f), new Vector3(0.028f, 0.026f, 0.03f));
 
     /// <summary>Curso da alavanca, de 0 (em cima) a 1 (abaixada).</summary>
     public float Down01 { get; private set; }
@@ -75,11 +79,18 @@ public class GlockTakedownLever : MonoBehaviour
     // LateUpdate: o Grabbable da alavanca (pegada sem movimento) a recoloca no lugar no Update.
     protected virtual void LateUpdate()
     {
+        if (_zone != null)
+        {
+            _zone.Blocked = Latched;
+        }
+
         float target = Latched ? 1f : Mathf.Max(LeverHandInput(), BothEndsTouched() ? 1f : 0f);
         if (!Latched && _slide.Offset < _requiredSlideOffset)
         {
-            // Com o ferrolho fechado o ressalto do cano prende a alavanca.
-            target = 0f;
+            // Com o ferrolho fechado o ressalto do cano impede a alavanca de descer mais. Mas a que já
+            // desceu fica onde está enquanto a mão segura: senão ela subiria no instante em que o
+            // ferrolho volta, antes de passar da bateria e prender a alavanca embaixo.
+            target = Mathf.Min(target, Down01);
         }
 
         Down01 = Mathf.MoveTowards(Down01, target, _speed * Time.deltaTime);

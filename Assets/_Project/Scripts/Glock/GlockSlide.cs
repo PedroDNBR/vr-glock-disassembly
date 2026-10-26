@@ -18,8 +18,9 @@ using UnityEngine;
 /// Por padrão quem anda é a arma, e o ferrolho fica parado na mão.
 ///
 /// Desmontagem: com a alavanca abaixada e o percussor disparado, o ferrolho perde o batente da
-/// frente. Puxado para a frente até sair dos trilhos, vira uma peça solta (com física), levando
-/// cano e mola (ver <see cref="GlockSlideLinkage"/>).
+/// frente. Puxado para a frente até sair dos trilhos (pela outra mão, ou pela própria pegada de
+/// desmontagem com a entrada para o lado oposto ao de recuar), vira uma peça solta (com física),
+/// levando cano e mola (ver <see cref="GlockSlideLinkage"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public class GlockSlide : MonoBehaviour, ITransformer
@@ -60,10 +61,6 @@ public class GlockSlide : MonoBehaviour, ITransformer
     [Tooltip("Zonas do frame que dependem do ferrolho (desmontagem, pegar pelo ferrolho). Bloqueadas quando ele sai; quem já está pegando continua.")]
     [SerializeField]
     private GlockGripZone[] _frameSlideZones;
-
-    [Tooltip("Colliders do frame que o ferrolho solto ignora, já que ele sai encostado no frame.")]
-    [SerializeField]
-    private Collider[] _frameColliders;
 
     [Tooltip("Curso para trás, em metros. Com 45 mm a culatra passa do cartucho de cima do carregador.")]
     [SerializeField, Min(0f)]
@@ -113,11 +110,15 @@ public class GlockSlide : MonoBehaviour, ITransformer
     [Header("Desmontagem")]
     [Tooltip("Com a alavanca abaixada, quanto a mola joga o ferrolho à frente da bateria ao soltar a pegada de desmontagem, em metros. Daí a alavanca fica presa embaixo.")]
     [SerializeField, Min(0f)]
-    private float _popForward = 0.012f;
+    private float _popForward = 0.008f;
 
     [Tooltip("Quanto o ferrolho anda para a frente da bateria, em metros, até sair dos trilhos.")]
     [SerializeField, Min(0f)]
-    private float _removeTravel = 0.03f;
+    private float _removeTravel = 0.08f;
+
+    [Tooltip("Até que parte do caminho para sair dos trilhos (0–1) a pegada de desmontagem empurra o ferrolho. O resto é puxando com a mão.")]
+    [SerializeField, Range(0f, 1f)]
+    private float _takedownPushFraction = 0.6f;
 
     [Tooltip("Massa do ferrolho solto (com cano e mola), em kg.")]
     [SerializeField, Min(0.01f)]
@@ -160,6 +161,7 @@ public class GlockSlide : MonoBehaviour, ITransformer
 
     private HandGrabInteractor _takedownHand;
     private float _thumbAtGrab;
+    private float _retractSign;
     private Vector3 _gunPositionAfterShift;
     private float _gunShift;
 
@@ -183,11 +185,17 @@ public class GlockSlide : MonoBehaviour, ITransformer
         // e o recuo da pegada de desmontagem.
         float offset = IsHeld ? _handOffset : _offset;
         float locked = _slideStop != null && _slideStop.IsLocked ? _slideStop.LockTravel * _travel : 0f;
-        float takedown = TakedownInput() * _takedownTravel;
+        float input = TakedownInput();
+        float takedown = Mathf.Max(0f, input) * _takedownTravel;
+
+        // Com a alavanca abaixada, a entrada da pegada de desmontagem para o lado oposto ao de recuar
+        // empurra o ferrolho para a frente, até sair dos trilhos.
+        float push = input < 0f && IsUnlocked ? -input * _removeTravel * _takedownPushFraction : 0f;
 
         // Até onde a mola leva o ferrolho: o retém, a pegada de desmontagem ou, com a alavanca
         // abaixada, um pouco à frente da bateria (o ferrolho "pula" para a frente, como na arma real).
-        float held = locked > 0f ? locked : takedown > 0f ? takedown : IsUnlocked ? -_popForward : 0f;
+        float held = locked > 0f ? locked : takedown > 0f ? takedown
+            : IsUnlocked ? -Mathf.Max(_popForward, push) : 0f;
         if (IsHeld)
         {
             _velocity = 0f;
@@ -223,6 +231,21 @@ public class GlockSlide : MonoBehaviour, ITransformer
             _lever.Latched = _offset < 0f;
         }
 
+        // À frente da bateria o ferrolho já está saindo: pegar nele é puxar pelo trilho, com ou sem a
+        // outra mão segurando a arma, e as zonas que pegariam a arma inteira pelo ferrolho ficam bloqueadas.
+        bool forward = _offset < 0f;
+        if (_slideZone != null)
+        {
+            _slideZone.SetMode(GlockGripMode.SlideDrag,
+                forward ? GlockGripZone.OtherHandRule.Any : GlockGripZone.OtherHandRule.MustHoldGun);
+        }
+
+        foreach (GlockGripZone zone in _frameSlideZones)
+        {
+            zone.Blocked = forward;
+        }
+
+        // Sai na mão de quem puxa.
         if (IsHeld && IsUnlocked && offset <= -_removeTravel)
         {
             Remove();
@@ -266,6 +289,10 @@ public class GlockSlide : MonoBehaviour, ITransformer
         _gunPositionAfterShift = gun.position;
     }
 
+    /// <summary>
+    /// Entrada da pegada de desmontagem, de −1 a 1: positivo recua o ferrolho; negativo (só com a
+    /// alavanca abaixada) empurra para a frente.
+    /// </summary>
     private float TakedownInput()
     {
         HandGrabInteractor interactor = TakedownInteractor();
@@ -276,28 +303,64 @@ public class GlockSlide : MonoBehaviour, ITransformer
             return 0f;
         }
 
+        if (newGrab)
+        {
+            _retractSign = 0f;
+        }
+
         var controller = interactor.GetComponent<IController>();
         if (controller == null)
         {
             // Hand tracking: o polegar, apoiado no beavertail, empurra a arma. Vale o quanto ele se
-            // mexeu desde a pegada, para qualquer lado.
+            // mexeu desde a pegada.
             float thumb = interactor.HandGrabApi.GetFingerPalmStrength(HandFinger.Thumb);
             if (newGrab)
             {
                 _thumbAtGrab = thumb;
             }
 
-            return Mathf.InverseLerp(_thumbInputRange.x, _thumbInputRange.y, Mathf.Abs(thumb - _thumbAtGrab));
+            return Signed(thumb - _thumbAtGrab, _thumbInputRange, 0f);
         }
 
-        // Controle: a força do indicador é o gatilho analógico (ControllerPinchAPI do SDK).
+        // Controle: a força do indicador é o gatilho analógico (ControllerPinchAPI do SDK); o
+        // gatilho só recua.
         float trigger = _takedownControl != TakedownControl.Stick
-            ? interactor.HandGrabApi.GetFingerPalmStrength(HandFinger.Index)
+            ? Mathf.InverseLerp(_takedownInputRange.x, _takedownInputRange.y,
+                interactor.HandGrabApi.GetFingerPalmStrength(HandFinger.Index))
             : 0f;
         float stick = _takedownControl != TakedownControl.Trigger
-            ? Mathf.Abs(controller.ControllerInput.Primary2DAxis.y)
+            ? Signed(controller.ControllerInput.Primary2DAxis.y, _takedownInputRange, -1f)
             : 0f;
-        return Mathf.InverseLerp(_takedownInputRange.x, _takedownInputRange.y, Mathf.Max(trigger, stick));
+        return trigger >= Mathf.Abs(stick) ? trigger : stick;
+    }
+
+    /// <summary>
+    /// Entrada com sentido. Com a alavanca em cima, qualquer lado recua, e o lado usado passa a ser o
+    /// de recuar. Com a alavanca abaixada, o lado oposto vira negativo (empurrar para a frente). Se o
+    /// recuo não usou esta entrada (no controle, recuou pelo gatilho), vale
+    /// <paramref name="defaultRetractSign"/>: no analógico, puxar recua e empurrar leva para a frente.
+    /// </summary>
+    private float Signed(float raw, Vector2 range, float defaultRetractSign)
+    {
+        float amount = Mathf.InverseLerp(range.x, range.y, Mathf.Abs(raw));
+        if (amount <= 0f)
+        {
+            return 0f;
+        }
+
+        float sign = Mathf.Sign(raw);
+        if (!IsUnlocked)
+        {
+            if (amount > 0.3f)
+            {
+                _retractSign = sign;
+            }
+
+            return amount;
+        }
+
+        float retract = _retractSign != 0f ? _retractSign : defaultRetractSign;
+        return retract == 0f || sign == retract ? amount : -amount;
     }
 
     private HandGrabInteractor TakedownInteractor()
@@ -343,6 +406,22 @@ public class GlockSlide : MonoBehaviour, ITransformer
     {
         IsRemoved = true;
         ShiftGun(0f);
+
+        // O ferrolho sai encostado no frame: ignora a colisão com tudo que fica na arma. Achado
+        // agora (e não serializado) porque o builder recria as caixas de colisão.
+        Collider[] gunColliders = _grip.transform.GetComponentsInChildren<Collider>(true);
+        Collider[] slideColliders = _slide.GetComponentsInChildren<Collider>(true);
+        foreach (Collider slideCollider in slideColliders)
+        {
+            foreach (Collider gunCollider in gunColliders)
+            {
+                if (!gunCollider.transform.IsChildOf(_slide))
+                {
+                    Physics.IgnoreCollision(slideCollider, gunCollider);
+                }
+            }
+        }
+
         _slide.SetParent(null, true);
 
         _body = _slide.gameObject.AddComponent<Rigidbody>();
@@ -350,13 +429,6 @@ public class GlockSlide : MonoBehaviour, ITransformer
         _body.isKinematic = true;
         _body.interpolation = RigidbodyInterpolation.None;
         _body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-        foreach (Collider slideCollider in _slide.GetComponentsInChildren<Collider>(true))
-        {
-            foreach (Collider frameCollider in _frameColliders)
-            {
-                Physics.IgnoreCollision(slideCollider, frameCollider);
-            }
-        }
 
         if (_lever != null)
         {

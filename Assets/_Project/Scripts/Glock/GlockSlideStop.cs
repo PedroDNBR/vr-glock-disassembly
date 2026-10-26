@@ -68,6 +68,7 @@ public class GlockSlideStop : MonoBehaviour
     private Quaternion _leverRest;
     private float _lever;
     private bool _armed = true;
+    private bool _restedOnStop;
 
     protected virtual void Awake()
     {
@@ -87,7 +88,16 @@ public class GlockSlideStop : MonoBehaviour
 
         if (IsLocked)
         {
-            bool slingshot = _slide.IsHeld && travel >= _releaseTravel && !_emptyMagazineInserted;
+            // Puxar e soltar só vale depois que o ferrolho já encostou no retém, e com o retém solto
+            // (sem dedo ou B/Y segurando ele em cima). Senão ele travava e soltava no mesmo instante
+            // quando o retém era levantado com o ferrolho todo atrás.
+            if (travel <= _lockTravel + 0.01f)
+            {
+                _restedOnStop = true;
+            }
+
+            bool slingshot = _restedOnStop && !held && _slide.IsHeld && travel >= _releaseTravel
+                && !_emptyMagazineInserted;
             if (pressed || slingshot)
             {
                 IsLocked = false;
@@ -98,6 +108,7 @@ public class GlockSlideStop : MonoBehaviour
         {
             IsLocked = true;
             _armed = false;
+            _restedOnStop = false;
         }
 
         _lever = Mathf.MoveTowards(_lever, IsLocked ? 1f : 0f, _leverSpeed * Time.deltaTime);

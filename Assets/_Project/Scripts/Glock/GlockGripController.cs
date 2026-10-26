@@ -71,14 +71,21 @@ public class GlockGripController : MonoBehaviour
     /// <summary>
     /// Se a ponta do polegar ou do indicador de alguma mão do hand tracking está dentro da caixa,
     /// no espaço local da arma. É o "botão" dos reténs no hand tracking; mãos de controle ficam de
-    /// fora, porque nelas os reténs usam os botões.
+    /// fora (nelas os reténs usam os botões), a não ser com <paramref name="includeControllers"/>.
+    /// Com <paramref name="freeHandsOnly"/>, só contam mãos que não estão pegando nada da arma.
     /// </summary>
-    public bool IsFingertipIn(Bounds localBox)
+    public bool IsFingertipIn(Bounds localBox, bool includeControllers = false, bool freeHandsOnly = false)
     {
         for (int i = 0; i < 2; i++)
         {
+            if (freeHandsOnly && _hands[i].Interactor != null)
+            {
+                continue;
+            }
+
             HandGrabInteractor interactor = TrackedInteractor((Handedness)i);
-            if (interactor == null || interactor.Hand == null || interactor.GetComponent<IController>() != null)
+            if (interactor == null || interactor.Hand == null
+                || (!includeControllers && interactor.GetComponent<IController>() != null))
             {
                 continue;
             }
@@ -134,12 +141,12 @@ public class GlockGripController : MonoBehaviour
             return slot.Resolved;
         }
 
-        bool otherHandHoldsGun = HoldsGun((Handedness)(1 - index));
+        GlockGripMode otherHandMode = GetMode((Handedness)(1 - index));
         GlockGripZone best = null;
         float bestDistance = float.PositiveInfinity;
         foreach (GlockGripZone zone in _zones)
         {
-            if (!zone.Accepts(interactor, otherHandHoldsGun, out float distance))
+            if (!zone.Accepts(interactor, otherHandMode, out float distance))
             {
                 continue;
             }

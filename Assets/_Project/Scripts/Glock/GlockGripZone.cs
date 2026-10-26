@@ -20,6 +20,9 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
         Any,
         MustHoldGun,
         MustNotHoldGun,
+
+        /// <summary>A outra mão não segura a arma, ou só segura numa pegada livre (que é solta ao pegar por aqui).</summary>
+        MustNotHoldGunExceptFree,
     }
 
     /// <summary>Eixo da mão comparado no ângulo de aceitação.</summary>
@@ -114,7 +117,7 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
     /// Se esta zona aceita a mão agora, ignorando as outras zonas. <paramref name="distance"/> é a
     /// distância da palma até o volume (0 dentro dele), usada para desempatar.
     /// </summary>
-    internal bool Accepts(HandGrabInteractor interactor, bool otherHandHoldsGun, out float distance)
+    internal bool Accepts(HandGrabInteractor interactor, GlockGripMode otherHandMode, out float distance)
     {
         distance = float.PositiveInfinity;
         if (!isActiveAndEnabled || Blocked)
@@ -122,8 +125,11 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
             return false;
         }
 
+        bool otherHandHoldsGun = GlockGripModes.HoldsGun(otherHandMode);
         if ((_otherHand == OtherHandRule.MustHoldGun && !otherHandHoldsGun)
-            || (_otherHand == OtherHandRule.MustNotHoldGun && otherHandHoldsGun))
+            || (_otherHand == OtherHandRule.MustNotHoldGun && otherHandHoldsGun)
+            || (_otherHand == OtherHandRule.MustNotHoldGunExceptFree && otherHandHoldsGun
+                && otherHandMode != GlockGripMode.Free))
         {
             return false;
         }
