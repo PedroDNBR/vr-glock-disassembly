@@ -89,9 +89,13 @@ public class GlockMagazine : MonoBehaviour, ITransformer
     private float _captureAngle = 25f;
 
     [Header("Retém do carregador")]
-    [Tooltip("Hand tracking: caixa de toque no retém do carregador, no espaço da arma.")]
+    [Tooltip("Hand tracking: caixa de toque no retém do carregador, no espaço da arma (aparece no Scene com o componente selecionado). Justa na face do botão.")]
     [SerializeField]
-    private Bounds _touchBox = new Bounds(new Vector3(-0.019f, 0.08f, -0.0365f), new Vector3(0.014f, 0.016f, 0.017f));
+    private Bounds _touchBox = new Bounds(new Vector3(-0.0155f, 0.08f, -0.036f), new Vector3(0.008f, 0.012f, 0.012f));
+
+    [Tooltip("Hand tracking: tempo, em segundos, que o dedo precisa ficar no botão para soltar o carregador. Evita soltar com o dedo só de passagem.")]
+    [SerializeField, Min(0f)]
+    private float _touchHoldTime = 0.15f;
 
     [Tooltip("Quanto o botão afunda, em metros, no espaço do pai dele.")]
     [SerializeField]
@@ -115,7 +119,8 @@ public class GlockMagazine : MonoBehaviour, ITransformer
     private Vector3 _buttonRest;
     private float _buttonPress;
     private bool _dropGrabPending;
-    private bool _touchWasDown;
+    private float _touchTime;
+    private bool _touchFired;
     private bool _autoSeating;
 
     protected virtual void Awake()
@@ -323,12 +328,34 @@ public class GlockMagazine : MonoBehaviour, ITransformer
             _buttonWasDown[i] = down;
         }
 
-        // Hand tracking: dedo no retém do carregador, com a arma na mão.
+        // Hand tracking: dedo parado no retém do carregador por um instante, com a arma na mão.
         bool touching = _grip.IsGunHeld && _grip.IsFingertipIn(_touchBox);
+        _touchTime = touching ? _touchTime + Time.deltaTime : 0f;
+        if (!touching)
+        {
+            _touchFired = false;
+        }
+        else if (!_touchFired && _touchTime >= _touchHoldTime)
+        {
+            _touchFired = true;
+            pressed = true;
+        }
+
         held |= touching;
-        pressed |= touching && !_touchWasDown;
-        _touchWasDown = touching;
         return pressed;
+    }
+
+    protected virtual void OnDrawGizmosSelected()
+    {
+        // Caixa de toque do hand tracking, no espaço da arma.
+        if (_grip == null)
+        {
+            return;
+        }
+
+        Gizmos.color = new Color(1f, 0.6f, 0f, 0.9f);
+        Gizmos.matrix = _grip.transform.localToWorldMatrix;
+        Gizmos.DrawWireCube(_touchBox.center, _touchBox.size);
     }
 
     #region ITransformer

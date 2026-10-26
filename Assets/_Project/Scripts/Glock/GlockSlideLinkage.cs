@@ -10,6 +10,9 @@ using UnityEngine;
 /// uns 3,5–4°, como na arma real). Mola: a guia fica parada, a luva externa (com a mola externa) acompanha o
 /// ferrolho e a mola interna, da flange da guia até a frente da luva, comprime.
 ///
+/// Desmontando (ferrolho à frente da bateria), cano e mola andam junto com o ferrolho e, quando ele
+/// sai da arma, passam a filhos dele.
+///
 /// Roda depois do <see cref="GlockSlide"/>, que define o curso do quadro.
 /// </summary>
 [DefaultExecutionOrder(100)]
@@ -22,6 +25,10 @@ public class GlockSlideLinkage : MonoBehaviour
     [Tooltip("Pivô do cano (BarrelDriver), sem rotação na posição montada.")]
     [SerializeField]
     private Transform _barrel;
+
+    [Tooltip("Conjunto da mola recuperadora (RecoilSpringAssembly), que sai junto com o ferrolho.")]
+    [SerializeField]
+    private Transform _springAssembly;
 
     [Tooltip("Luva externa da mola (OuterSleeve), que acompanha o ferrolho.")]
     [SerializeField]
@@ -57,11 +64,30 @@ public class GlockSlideLinkage : MonoBehaviour
     private Vector3 _barrelRest;
     private Quaternion _barrelRestRotation;
     private Vector3 _sleeveRest;
+    private Vector3 _springAssemblyRest;
     private Vector3 _innerSpringRestScale;
 
     protected virtual void Awake()
     {
         Initialize();
+    }
+
+    protected virtual void OnEnable()
+    {
+        _slide.WhenRemoved += HandleSlideRemoved;
+    }
+
+    protected virtual void OnDisable()
+    {
+        _slide.WhenRemoved -= HandleSlideRemoved;
+    }
+
+    private void HandleSlideRemoved()
+    {
+        // Cano e mola saem com o ferrolho. Daqui em diante quem mexe neles é a D8/D9.
+        _barrel.SetParent(_slide.SlideTransform, true);
+        _springAssembly.SetParent(_slide.SlideTransform, true);
+        enabled = false;
     }
 
     protected virtual void LateUpdate()
@@ -74,6 +100,19 @@ public class GlockSlideLinkage : MonoBehaviour
     {
         Initialize();
 
+        if (offset < 0f)
+        {
+            // Desmontando: cano e mola, já soltos do frame, andam para a frente com o ferrolho.
+            Vector3 forward = Vector3.forward * -offset;
+            _barrel.localRotation = _barrelRestRotation;
+            _barrel.localPosition = _barrelRest + forward;
+            _springAssembly.localPosition = _springAssemblyRest + forward;
+            _outerSleeve.localPosition = _sleeveRest;
+            _innerSpring.localScale = _innerSpringRestScale;
+            return;
+        }
+
+        _springAssembly.localPosition = _springAssemblyRest;
         float back = Mathf.Min(offset, _barrelTravel);
         float drop = Mathf.InverseLerp(_lockedTravel, _barrelTravel, offset) * _breechDrop;
 
@@ -102,6 +141,7 @@ public class GlockSlideLinkage : MonoBehaviour
         _barrelRest = _barrel.localPosition;
         _barrelRestRotation = _barrel.localRotation;
         _sleeveRest = _outerSleeve.localPosition;
+        _springAssemblyRest = _springAssembly.localPosition;
         _innerSpringRestScale = _innerSpring.localScale;
     }
 }

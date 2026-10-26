@@ -5,8 +5,9 @@ using Oculus.Interaction.Input;
 using UnityEngine;
 
 /// <summary>
-/// Ferrolho da Glock no trilho. Quem move o ferrolho é o Grabbable dele (arrasto com a outra
-/// mão); aqui o curso é limitado e, solto, o ferrolho volta para a frente pela mola.
+/// Ferrolho da Glock no trilho. O Grabbable dele (arrasto com a outra mão) usa este componente
+/// como transformer: na arma, só o deslocamento ao longo do trilho conta; o curso é limitado e,
+/// solto, o ferrolho volta para a frente pela mola.
 ///
 /// Ao voltar à bateria depois de ter ido quase até o fim, arma o percussor, como na Glock real:
 /// o percussor é preso pela barra do gatilho na volta do ferrolho.
@@ -15,9 +16,13 @@ using UnityEngine;
 /// o polegar empurra a arma para a frente, alguns milímetros: no controle, pelo gatilho analógico
 /// ou pelo analógico (eixo Y, para qualquer lado); no hand tracking, pelo movimento do polegar.
 /// Por padrão quem anda é a arma, e o ferrolho fica parado na mão.
+///
+/// Desmontagem: com a alavanca abaixada e o percussor disparado, o ferrolho perde o batente da
+/// frente. Puxado para a frente até sair dos trilhos, vira uma peça solta (com física), levando
+/// cano e mola (ver <see cref="GlockSlideLinkage"/>).
 /// </summary>
 [DisallowMultipleComponent]
-public class GlockSlide : MonoBehaviour
+public class GlockSlide : MonoBehaviour, ITransformer
 {
     public enum TakedownControl
     {
@@ -32,12 +37,9 @@ public class GlockSlide : MonoBehaviour
     [SerializeField]
     private Transform _slide;
 
-    [Tooltip("Grabbable do ferrolho, com um OneGrabTranslateTransformer.")]
+    [Tooltip("Grabbable do ferrolho. O transformer dele deve ser este componente.")]
     [SerializeField]
     private Grabbable _grabbable;
-
-    [SerializeField]
-    private OneGrabTranslateTransformer _transformer;
 
     [Tooltip("Opcional: percussor armado ao manobrar o ferrolho.")]
     [SerializeField]
@@ -46,6 +48,22 @@ public class GlockSlide : MonoBehaviour
     [Tooltip("Opcional: retém que segura o ferrolho aberto.")]
     [SerializeField]
     private GlockSlideStop _slideStop;
+
+    [Tooltip("Opcional: alavanca de desmontagem. Abaixada, com o percussor disparado, deixa o ferrolho sair pela frente.")]
+    [SerializeField]
+    private GlockTakedownLever _lever;
+
+    [Tooltip("Zona de pegada do ferrolho (arrasto). Quando ele sai da arma, vira pegada de peça solta.")]
+    [SerializeField]
+    private GlockGripZone _slideZone;
+
+    [Tooltip("Zonas do frame que dependem do ferrolho (desmontagem, pegar pelo ferrolho). Bloqueadas quando ele sai; quem já está pegando continua.")]
+    [SerializeField]
+    private GlockGripZone[] _frameSlideZones;
+
+    [Tooltip("Colliders do frame que o ferrolho solto ignora, já que ele sai encostado no frame.")]
+    [SerializeField]
+    private Collider[] _frameColliders;
 
     [Tooltip("Curso para trás, em metros. Com 45 mm a culatra passa do cartucho de cima do carregador.")]
     [SerializeField, Min(0f)]
@@ -92,8 +110,35 @@ public class GlockSlide : MonoBehaviour
     [SerializeField, Min(0f)]
     private float _takedownSpeed = 0.25f;
 
+    [Header("Desmontagem")]
+    [Tooltip("Com a alavanca abaixada, quanto a mola joga o ferrolho à frente da bateria ao soltar a pegada de desmontagem, em metros. Daí a alavanca fica presa embaixo.")]
+    [SerializeField, Min(0f)]
+    private float _popForward = 0.012f;
+
+    [Tooltip("Quanto o ferrolho anda para a frente da bateria, em metros, até sair dos trilhos.")]
+    [SerializeField, Min(0f)]
+    private float _removeTravel = 0.03f;
+
+    [Tooltip("Massa do ferrolho solto (com cano e mola), em kg.")]
+    [SerializeField, Min(0.01f)]
+    private float _removedMass = 0.3f;
+
     /// <summary>O ferrolho foi até perto do fim e voltou à bateria.</summary>
     public event Action WhenRacked = delegate { };
+
+    /// <summary>O ferrolho saiu dos trilhos e virou peça solta.</summary>
+    public event Action WhenRemoved = delegate { };
+
+    public Transform SlideTransform => _slide;
+
+    public bool IsRemoved { get; private set; }
+
+    /// <summary>
+    /// Sem o batente da frente: alavanca abaixada com o percussor disparado, ou o ferrolho já à
+    /// frente da bateria (aí a alavanca fica presa embaixo).
+    /// </summary>
+    public bool IsUnlocked => !IsRemoved
+        && (_offset < 0f || (_lever != null && _lever.IsDown && (_trigger == null || !_trigger.IsCocked)));
 
     /// <summary>Curso atual, de 0 (em bateria) a 1 (fim do curso).</summary>
     public float Travel01 => _travel > 0f ? _offset / _travel : 0f;
@@ -102,6 +147,11 @@ public class GlockSlide : MonoBehaviour
     public float Offset => _offset;
 
     public bool IsHeld => _grabbable.SelectingPointsCount > 0;
+
+    private IGrabbable _grabbableApi;
+    private Pose _grabToSlide;
+    private float _handOffset;
+    private Rigidbody _body;
 
     private Vector3 _rest;
     private float _offset;
@@ -116,18 +166,35 @@ public class GlockSlide : MonoBehaviour
     protected virtual void Awake()
     {
         _rest = _slide.localPosition;
-        LimitTransformer();
     }
 
     protected virtual void LateUpdate()
     {
-        // O Grabbable já moveu o ferrolho no Update dos interactors; aqui só limita, aplica a mola
+        if (IsRemoved)
+        {
+            // Peça solta: cinemática na mão, com física fora dela. Sem interpolação na mão, que o
+            // Grabbable move o transform direto.
+            _body.isKinematic = IsHeld;
+            _body.interpolation = IsHeld ? RigidbodyInterpolation.None : RigidbodyInterpolation.Interpolate;
+            return;
+        }
+
+        // A mão (UpdateTransform) já disse onde quer o ferrolho; aqui entram limites, mola, retém
         // e o recuo da pegada de desmontagem.
-        float offset = _rest.z - _slide.localPosition.z;
+        float offset = IsHeld ? _handOffset : _offset;
         float locked = _slideStop != null && _slideStop.IsLocked ? _slideStop.LockTravel * _travel : 0f;
-        float held = Mathf.Max(TakedownInput() * _takedownTravel, locked);
+        float takedown = TakedownInput() * _takedownTravel;
+
+        // Até onde a mola leva o ferrolho: o retém, a pegada de desmontagem ou, com a alavanca
+        // abaixada, um pouco à frente da bateria (o ferrolho "pula" para a frente, como na arma real).
+        float held = locked > 0f ? locked : takedown > 0f ? takedown : IsUnlocked ? -_popForward : 0f;
         if (IsHeld)
         {
+            _velocity = 0f;
+        }
+        else if (offset < 0f && offset <= held)
+        {
+            // Mais à frente que isso (desmontando) a mola não empurra: fica onde foi deixado.
             _velocity = 0f;
         }
         else if (offset > held)
@@ -147,8 +214,20 @@ public class GlockSlide : MonoBehaviour
             offset = Mathf.MoveTowards(offset, held, _takedownSpeed * Time.deltaTime);
         }
 
-        // Com o retém em cima, o ferrolho não passa da trava para a frente.
-        _offset = Mathf.Clamp(offset, locked, _travel);
+        // Com o retém em cima, o ferrolho não passa da trava para a frente; destravado para a
+        // desmontagem, pode ir até sair dos trilhos.
+        float forwardLimit = locked > 0f ? locked : IsUnlocked ? -_removeTravel : 0f;
+        _offset = Mathf.Clamp(offset, forwardLimit, _travel);
+        if (_lever != null)
+        {
+            _lever.Latched = _offset < 0f;
+        }
+
+        if (IsHeld && IsUnlocked && offset <= -_removeTravel)
+        {
+            Remove();
+            return;
+        }
 
         _slide.localPosition = new Vector3(_rest.x, _rest.y, _rest.z - _offset);
         if (_trigger != null && _offset >= _triggerResetTravel)
@@ -156,8 +235,10 @@ public class GlockSlide : MonoBehaviour
             _trigger.ResetTrigger();
         }
 
-        // Com o ferrolho travado aberto quem segura é o retém, não a mão: a arma não anda.
-        ShiftGun(_takedownMovesGun && _takedownHand != null && !IsHeld && locked <= 0f ? _offset : 0f);
+        // Só enquanto a pegada de desmontagem segura o ferrolho atrás. Travado aberto quem segura é o
+        // retém; à frente da bateria (desmontando) o ferrolho já saiu da mão.
+        bool handHoldsSlideBack = _takedownMovesGun && _takedownHand != null && !IsHeld && locked <= 0f && _offset > 0f;
+        ShiftGun(handHoldsSlideBack ? _offset : 0f);
         UpdateRack();
     }
 
@@ -257,32 +338,76 @@ public class GlockSlide : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Deixa o limite do transformer igual ao curso daqui, para o ferrolho não passar do fim
-    /// nem no quadro em que é arrastado.
-    /// </summary>
-    private void LimitTransformer()
+    /// <summary>O ferrolho sai dos trilhos: vira peça solta com física, ainda na mão.</summary>
+    private void Remove()
     {
-        if (_transformer == null)
+        IsRemoved = true;
+        ShiftGun(0f);
+        _slide.SetParent(null, true);
+
+        _body = _slide.gameObject.AddComponent<Rigidbody>();
+        _body.mass = _removedMass;
+        _body.isKinematic = true;
+        _body.interpolation = RigidbodyInterpolation.None;
+        _body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        foreach (Collider slideCollider in _slide.GetComponentsInChildren<Collider>(true))
         {
+            foreach (Collider frameCollider in _frameColliders)
+            {
+                Physics.IgnoreCollision(slideCollider, frameCollider);
+            }
+        }
+
+        if (_lever != null)
+        {
+            _lever.Latched = false;
+        }
+
+        if (_slideZone != null)
+        {
+            _slideZone.SetMode(GlockGripMode.Part, GlockGripZone.OtherHandRule.Any);
+        }
+
+        foreach (GlockGripZone zone in _frameSlideZones)
+        {
+            zone.Blocked = true;
+        }
+
+        WhenRemoved();
+    }
+
+    #region ITransformer
+
+    public void Initialize(IGrabbable grabbable)
+    {
+        _grabbableApi = grabbable;
+    }
+
+    public void BeginTransform()
+    {
+        Pose grab = _grabbableApi.GrabPoints[0];
+        Quaternion inverse = Quaternion.Inverse(grab.rotation);
+        _grabToSlide = new Pose(inverse * (_slide.position - grab.position), inverse * _slide.rotation);
+        _handOffset = _offset;
+    }
+
+    public void UpdateTransform()
+    {
+        Pose grab = _grabbableApi.GrabPoints[0];
+        Vector3 position = grab.position + grab.rotation * _grabToSlide.position;
+        if (IsRemoved)
+        {
+            _slide.SetPositionAndRotation(position, grab.rotation * _grabToSlide.rotation);
             return;
         }
 
-        var constraints = new OneGrabTranslateTransformer.OneGrabTranslateConstraints
-        {
-            ConstraintsAreRelative = false,
-            MinX = Locked(_rest.x),
-            MaxX = Locked(_rest.x),
-            MinY = Locked(_rest.y),
-            MaxY = Locked(_rest.y),
-            MinZ = Locked(_rest.z - _travel),
-            MaxZ = Locked(_rest.z),
-        };
-        _transformer.Constraints = constraints;
+        // No trilho só o deslocamento em Z (no espaço da arma) conta; o LateUpdate limita.
+        _handOffset = _rest.z - _slide.parent.InverseTransformPoint(position).z;
     }
 
-    private static FloatConstraint Locked(float value)
+    public void EndTransform()
     {
-        return new FloatConstraint { Constrain = true, Value = value };
     }
+
+    #endregion
 }

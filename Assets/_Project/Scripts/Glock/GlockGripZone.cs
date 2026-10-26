@@ -68,6 +68,12 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
     [SerializeField, Range(0f, 180f)]
     private float _maxAngle = 60f;
 
+    /// <summary>
+    /// Bloqueada não aceita mãos novas, mas a mão que já está pegando continua (ex.: a pegada de
+    /// desmontagem depois que o ferrolho sai).
+    /// </summary>
+    public bool Blocked { get; set; }
+
     public GlockGripMode Mode => _mode;
     public int Priority => _priority;
     public bool HoldsGun => GlockGripModes.HoldsGun(_mode);
@@ -111,7 +117,7 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
     internal bool Accepts(HandGrabInteractor interactor, bool otherHandHoldsGun, out float distance)
     {
         distance = float.PositiveInfinity;
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled || Blocked)
         {
             return false;
         }
@@ -196,6 +202,13 @@ public class GlockGripZone : MonoBehaviour, IGameObjectFilter
         _interactables = interactables;
         _mode = mode;
         _priority = priority;
+        _otherHand = otherHand;
+    }
+
+    /// <summary>Troca o modo e a regra da outra mão, por exemplo quando a peça sai da arma.</summary>
+    public void SetMode(GlockGripMode mode, OtherHandRule otherHand)
+    {
+        _mode = mode;
         _otherHand = otherHand;
     }
 

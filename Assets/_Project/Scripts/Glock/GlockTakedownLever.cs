@@ -50,7 +50,7 @@ public class GlockTakedownLever : MonoBehaviour
     [SerializeField]
     private Vector2 _handInputRange = new Vector2(0.15f, 0.55f);
 
-    [Tooltip("Hand tracking: caixa de toque na ponta da alavanca do lado +X, no espaço da arma. O lado −X é espelhado.")]
+    [Tooltip("Hand tracking: caixa de toque na ponta da alavanca do lado +X, no espaço da arma (aparece no Scene com o componente selecionado). O lado −X é espelhado.")]
     [SerializeField]
     private Bounds _touchBox = new Bounds(new Vector3(0.018f, 0.106f, 0.0042f), new Vector3(0.016f, 0.014f, 0.016f));
 
@@ -58,6 +58,12 @@ public class GlockTakedownLever : MonoBehaviour
     public float Down01 { get; private set; }
 
     public bool IsDown => Down01 >= _downThreshold;
+
+    /// <summary>
+    /// Presa embaixo pelo ferrolho que passou à frente da bateria (desmontando). Controlado pelo
+    /// <see cref="GlockSlide"/>.
+    /// </summary>
+    public bool Latched { get; set; }
 
     private Vector3 _rest;
 
@@ -69,8 +75,8 @@ public class GlockTakedownLever : MonoBehaviour
     // LateUpdate: o Grabbable da alavanca (pegada sem movimento) a recoloca no lugar no Update.
     protected virtual void LateUpdate()
     {
-        float target = Mathf.Max(LeverHandInput(), BothEndsTouched() ? 1f : 0f);
-        if (_slide.Offset < _requiredSlideOffset)
+        float target = Latched ? 1f : Mathf.Max(LeverHandInput(), BothEndsTouched() ? 1f : 0f);
+        if (!Latched && _slide.Offset < _requiredSlideOffset)
         {
             // Com o ferrolho fechado o ressalto do cano prende a alavanca.
             target = 0f;
@@ -108,5 +114,19 @@ public class GlockTakedownLever : MonoBehaviour
 
         Bounds other = new Bounds(Vector3.Scale(_touchBox.center, new Vector3(-1f, 1f, 1f)), _touchBox.size);
         return _grip.IsFingertipIn(_touchBox) && _grip.IsFingertipIn(other);
+    }
+
+    protected virtual void OnDrawGizmosSelected()
+    {
+        // Caixa de toque do hand tracking, no espaço da arma.
+        if (_grip == null)
+        {
+            return;
+        }
+
+        Gizmos.color = new Color(1f, 0.6f, 0f, 0.9f);
+        Gizmos.matrix = _grip.transform.localToWorldMatrix;
+        Gizmos.DrawWireCube(_touchBox.center, _touchBox.size);
+        Gizmos.DrawWireCube(Vector3.Scale(_touchBox.center, new Vector3(-1f, 1f, 1f)), _touchBox.size);
     }
 }

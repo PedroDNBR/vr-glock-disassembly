@@ -22,7 +22,6 @@ internal static class GlockGripSetup
 
     // Medidas no espaço local da raiz da Glock (metros, cano em +Z).
     private const float GripAngle = 20f;
-    private const float SlideTravel = 0.045f;
 
     // O carregador é inclinado como o cabo: 19° da vertical, com o topo para a frente.
     private const float MagazineAngle = 19f;
@@ -178,11 +177,14 @@ internal static class GlockGripSetup
         gunData.FindProperty("_throwWhenUnselected").boolValue = true;
         gunData.ApplyModifiedPropertiesWithoutUndo();
 
-        // O ferrolho corre só em Z local. Em jogo, o GlockSlide refaz esse limite a partir do curso dele.
-        var slideTranslate = GetOrAdd<OneGrabTranslateTransformer>(slide.gameObject);
-        Vector3 slideRest = slide.localPosition;
-        LockTranslation(slideTranslate, slideRest, new Vector2(slideRest.z - SlideTravel, slideRest.z));
-        Grabbable slideGrab = SetupGrabbable(slide, null, slideTranslate);
+        // O GlockSlide é o transformer do ferrolho: trilho na arma e pegada livre depois de desmontado.
+        var oldSlideTranslate = slide.GetComponent<OneGrabTranslateTransformer>();
+        if (oldSlideTranslate != null)
+        {
+            Object.DestroyImmediate(oldSlideTranslate);
+        }
+
+        Grabbable slideGrab = SetupGrabbable(slide, null, root.GetComponent<GlockSlide>());
 
         // Provisório até a D-fase: a alavanca aceita a pegada mas não se mexe.
         var leverTranslate = GetOrAdd<OneGrabTranslateTransformer>(lever.gameObject);

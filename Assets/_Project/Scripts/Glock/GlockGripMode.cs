@@ -25,6 +25,9 @@ public enum GlockGripMode
 
     /// <summary>Segurando o carregador, fora da arma ou correndo no poço.</summary>
     Magazine,
+
+    /// <summary>Segurando uma peça já desmontada (ferrolho, cano, mola).</summary>
+    Part,
 }
 
 public static class GlockGripModes

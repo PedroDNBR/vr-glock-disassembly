@@ -43,7 +43,7 @@ public class GlockSlideStop : MonoBehaviour
     [SerializeField, Min(0.1f)]
     private float _leverSpeed = 20f;
 
-    [Tooltip("Hand tracking: caixa de toque no retém do lado +X, no espaço da arma. O lado −X é espelhado.")]
+    [Tooltip("Hand tracking: caixa de toque no retém do lado +X, no espaço da arma (aparece no Scene com o componente selecionado). O lado −X é espelhado.")]
     [SerializeField]
     private Bounds _touchBox = new Bounds(new Vector3(0.021f, 0.11f, -0.037f), new Vector3(0.018f, 0.02f, 0.024f));
 
@@ -130,5 +130,19 @@ public class GlockSlideStop : MonoBehaviour
         held |= touching;
         pressed |= touching && !_touchWasDown;
         _touchWasDown = touching;
+    }
+
+    protected virtual void OnDrawGizmosSelected()
+    {
+        // Caixa de toque do hand tracking, no espaço da arma.
+        if (_grip == null)
+        {
+            return;
+        }
+
+        Gizmos.color = new Color(1f, 0.6f, 0f, 0.9f);
+        Gizmos.matrix = _grip.transform.localToWorldMatrix;
+        Gizmos.DrawWireCube(_touchBox.center, _touchBox.size);
+        Gizmos.DrawWireCube(Vector3.Scale(_touchBox.center, new Vector3(-1f, 1f, 1f)), _touchBox.size);
     }
 }

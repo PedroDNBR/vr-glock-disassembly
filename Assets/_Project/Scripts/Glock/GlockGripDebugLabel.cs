@@ -90,7 +90,8 @@ public class GlockGripDebugLabel : MonoBehaviour
 
         if (_slide != null)
         {
-            text += "\nFerrolho " + _slide.Travel01.ToString("F2") + "  | manobras " + _racks;
+            text += "\nFerrolho " + (_slide.IsRemoved ? "fora da arma" : _slide.Travel01.ToString("F2")
+                + (_slide.IsUnlocked ? " (destravado)" : "")) + "  | manobras " + _racks;
             if (_slideStop != null)
             {
                 text += "  | " + (_slideStop.IsLocked ? "travado aberto" : "livre");
