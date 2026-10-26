@@ -59,6 +59,10 @@ public class GlockSlide : MonoBehaviour
     [SerializeField, Range(0f, 1f)]
     private float _rackThreshold = 0.8f;
 
+    [Tooltip("Recuo, em metros, que solta o gatilho morto para a frente (reset). Maior que o recuo da desmontagem, como na arma real.")]
+    [SerializeField, Min(0f)]
+    private float _triggerResetTravel = 0.01f;
+
     [Tooltip("Distância da bateria, em metros, que já conta como ferrolho fechado.")]
     [SerializeField, Min(0f)]
     private float _batteryTolerance = 0.001f;
@@ -93,6 +97,9 @@ public class GlockSlide : MonoBehaviour
 
     /// <summary>Curso atual, de 0 (em bateria) a 1 (fim do curso).</summary>
     public float Travel01 => _travel > 0f ? _offset / _travel : 0f;
+
+    /// <summary>Recuo atual do ferrolho, em metros.</summary>
+    public float Offset => _offset;
 
     public bool IsHeld => _grabbable.SelectingPointsCount > 0;
 
@@ -144,6 +151,11 @@ public class GlockSlide : MonoBehaviour
         _offset = Mathf.Clamp(offset, locked, _travel);
 
         _slide.localPosition = new Vector3(_rest.x, _rest.y, _rest.z - _offset);
+        if (_trigger != null && _offset >= _triggerResetTravel)
+        {
+            _trigger.ResetTrigger();
+        }
+
         // Com o ferrolho travado aberto quem segura é o retém, não a mão: a arma não anda.
         ShiftGun(_takedownMovesGun && _takedownHand != null && !IsHeld && locked <= 0f ? _offset : 0f);
         UpdateRack();

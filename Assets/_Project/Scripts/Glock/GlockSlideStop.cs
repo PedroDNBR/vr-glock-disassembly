@@ -12,7 +12,8 @@ using UnityEngine;
 ///   fecha), a não ser que haja um carregador vazio: o transportador segura o retém em cima.
 /// - Com carregador vazio inserido, o ferrolho trava aberto sozinho ao ir para trás.
 ///
-/// No hand tracking (fase G), a ideia é acionar encostando o polegar no retém.
+/// No hand tracking, encostar a ponta do polegar ou do indicador no retém (qualquer lado) faz o
+/// papel do B/Y: encostado é "segurando", e o toque que começa é "apertou".
 /// </summary>
 [DisallowMultipleComponent]
 public class GlockSlideStop : MonoBehaviour
@@ -42,7 +43,11 @@ public class GlockSlideStop : MonoBehaviour
     [SerializeField, Min(0.1f)]
     private float _leverSpeed = 20f;
 
-    [Tooltip("Carregador vazio inserido: o transportador levanta o retém. A D4 passa a controlar isso.")]
+    [Tooltip("Hand tracking: caixa de toque no retém do lado +X, no espaço da arma. O lado −X é espelhado.")]
+    [SerializeField]
+    private Bounds _touchBox = new Bounds(new Vector3(0.021f, 0.11f, -0.037f), new Vector3(0.018f, 0.02f, 0.024f));
+
+    [Tooltip("Carregador vazio inserido: o transportador levanta o retém. O GlockMagazine controla isso.")]
     [SerializeField]
     private bool _emptyMagazineInserted = true;
 
@@ -59,6 +64,7 @@ public class GlockSlideStop : MonoBehaviour
     }
 
     private readonly bool[] _buttonWasDown = new bool[2];
+    private bool _touchWasDown;
     private Quaternion _leverRest;
     private float _lever;
     private bool _armed = true;
@@ -117,5 +123,12 @@ public class GlockSlideStop : MonoBehaviour
             pressed |= down && !_buttonWasDown[i];
             _buttonWasDown[i] = down;
         }
+
+        // Hand tracking: dedo no retém, de qualquer lado, com a arma na mão.
+        Bounds mirrored = new Bounds(Vector3.Scale(_touchBox.center, new Vector3(-1f, 1f, 1f)), _touchBox.size);
+        bool touching = _grip.IsGunHeld && (_grip.IsFingertipIn(_touchBox) || _grip.IsFingertipIn(mirrored));
+        held |= touching;
+        pressed |= touching && !_touchWasDown;
+        _touchWasDown = touching;
     }
 }

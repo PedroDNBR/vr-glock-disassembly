@@ -326,6 +326,17 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &137571739 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3681309476440175251, guid: d95d77160712c3748aeb3fbdc0a33ff8, type: 3}
+  m_PrefabInstance: {fileID: 2030257671}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f3c423dada83f6489b91aec1a936a53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockTakedownLever
 --- !u!1 &313593640
 GameObject:
   m_ObjectHideFlags: 0
@@ -1095,6 +1106,7 @@ MonoBehaviour:
   _slide: {fileID: 2030257675}
   _slideStop: {fileID: 2030257676}
   _magazine: {fileID: 484072278}
+  _lever: {fileID: 137571739}
   _offset: {x: 0, y: 0.25, z: 0}
 --- !u!102 &2002934691
 TextMesh:

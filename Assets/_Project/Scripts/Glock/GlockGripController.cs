@@ -34,6 +34,8 @@ public class GlockGripController : MonoBehaviour
 
     private readonly HandSlot[] _hands = new HandSlot[2];
 
+    private static readonly HandJointId[] Fingertips = { HandJointId.HandThumbTip, HandJointId.HandIndexTip };
+
     public bool IsGunHeld => HoldsGun(Handedness.Left) || HoldsGun(Handedness.Right);
 
     public GlockGripMode GetMode(Handedness hand)
@@ -64,6 +66,46 @@ public class GlockGripController : MonoBehaviour
         interactor = fresh ? slot.ResolvedFor : null;
         zone = fresh ? slot.Resolved : null;
         return fresh;
+    }
+
+    /// <summary>
+    /// Se a ponta do polegar ou do indicador de alguma mão do hand tracking está dentro da caixa,
+    /// no espaço local da arma. É o "botão" dos reténs no hand tracking; mãos de controle ficam de
+    /// fora, porque nelas os reténs usam os botões.
+    /// </summary>
+    public bool IsFingertipIn(Bounds localBox)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            HandGrabInteractor interactor = TrackedInteractor((Handedness)i);
+            if (interactor == null || interactor.Hand == null || interactor.GetComponent<IController>() != null)
+            {
+                continue;
+            }
+
+            foreach (HandJointId joint in Fingertips)
+            {
+                if (interactor.Hand.GetJointPose(joint, out Pose tip)
+                    && localBox.Contains(transform.InverseTransformPoint(tip.position)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>O interactor da mão: o que está pegando algo da arma ou, senão, o que está procurando.</summary>
+    private HandGrabInteractor TrackedInteractor(Handedness hand)
+    {
+        HandSlot slot = _hands[(int)hand];
+        if (slot.Interactor != null)
+        {
+            return slot.Interactor;
+        }
+
+        return Time.frameCount - slot.ResolvedFrame <= 1 ? slot.ResolvedFor : null;
     }
 
     protected virtual void Awake()

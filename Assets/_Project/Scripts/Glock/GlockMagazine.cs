@@ -7,7 +7,8 @@ using UnityEngine;
 /// <summary>
 /// Carregador da Glock. Três estados:
 /// - <see cref="MagazineState.Seated"/>: inserido e travado, parte da arma. No controle, A/X numa mão
-///   que segura a arma aperta o retém do carregador e ele começa a sair.
+///   que segura a arma aperta o retém do carregador e ele começa a sair; no hand tracking, encostar
+///   a ponta do polegar ou do indicador no retém.
 /// - <see cref="MagazineState.InWell"/>: corre no eixo do cabo. Sem mão, desce pelo peso (vazio, ele
 ///   cai sozinho, como na Gen5); com a mão, segue a projeção dela no eixo. Empurrado até o fim, trava.
 /// - <see cref="MagazineState.Free"/>: fora da arma, objeto com física, pegável e arremessável.
@@ -68,7 +69,7 @@ public class GlockMagazine : MonoBehaviour, ITransformer
 
     [Tooltip("Quanto do curso o carregador precisa entrar empurrado pela mão para subir o resto sozinho e travar.")]
     [SerializeField, Range(0f, 1f)]
-    private float _autoSeatInsertion = 0.65f;
+    private float _autoSeatInsertion = 0.55f;
 
     [Tooltip("Velocidade com que o carregador sobe sozinho até travar, em m/s.")]
     [SerializeField, Min(0.01f)]
@@ -88,6 +89,10 @@ public class GlockMagazine : MonoBehaviour, ITransformer
     private float _captureAngle = 25f;
 
     [Header("Retém do carregador")]
+    [Tooltip("Hand tracking: caixa de toque no retém do carregador, no espaço da arma.")]
+    [SerializeField]
+    private Bounds _touchBox = new Bounds(new Vector3(-0.019f, 0.08f, -0.0365f), new Vector3(0.014f, 0.016f, 0.017f));
+
     [Tooltip("Quanto o botão afunda, em metros, no espaço do pai dele.")]
     [SerializeField]
     private Vector3 _buttonTravel = new Vector3(0.0015f, 0f, 0f);
@@ -110,6 +115,7 @@ public class GlockMagazine : MonoBehaviour, ITransformer
     private Vector3 _buttonRest;
     private float _buttonPress;
     private bool _dropGrabPending;
+    private bool _touchWasDown;
     private bool _autoSeating;
 
     protected virtual void Awake()
@@ -317,6 +323,11 @@ public class GlockMagazine : MonoBehaviour, ITransformer
             _buttonWasDown[i] = down;
         }
 
+        // Hand tracking: dedo no retém do carregador, com a arma na mão.
+        bool touching = _grip.IsGunHeld && _grip.IsFingertipIn(_touchBox);
+        held |= touching;
+        pressed |= touching && !_touchWasDown;
+        _touchWasDown = touching;
         return pressed;
     }
 

@@ -9,8 +9,11 @@ using UnityEngine;
 /// hand tracking, a curvatura do indicador.
 ///
 /// Como na arma real: a trava (a lâmina no meio do gatilho) afunda primeiro e só então o gatilho
-/// inteiro gira. Perto do fim do curso o percussor solta. Depois disso o gatilho fica atrás
-/// ("gatilho morto") até o ferrolho ser manobrado, o que arma o percussor de novo.
+/// inteiro gira. Perto do fim do curso o percussor solta. Depois disso:
+/// - o gatilho fica atrás ("gatilho morto") até o ferrolho recuar ~1 cm, quando ele volta (reset);
+/// - o percussor só é armado quando o ferrolho volta à bateria;
+/// - fora da bateria o gatilho não dispara, e para disparar de novo ele precisa voltar até o
+///   ponto de reset (quem segura o gatilho ao manobrar precisa soltá-lo um pouco).
 /// </summary>
 [DisallowMultipleComponent]
 public class GlockTrigger : MonoBehaviour
@@ -23,6 +26,10 @@ public class GlockTrigger : MonoBehaviour
 
     [SerializeField]
     private Transform _safetyPivot;
+
+    [Tooltip("Opcional: com o ferrolho fora da bateria o gatilho não dispara.")]
+    [SerializeField]
+    private GlockSlide _slide;
 
     [Header("Curso")]
     [Tooltip("Rotação do gatilho no fim do curso, em graus, no X local do pivô (positivo leva a sapata para trás).")]
@@ -37,9 +44,13 @@ public class GlockTrigger : MonoBehaviour
     [SerializeField, Range(0.01f, 0.99f)]
     private float _safetyTravel = 0.15f;
 
-    [Tooltip("Faixa da força do indicador que vira curso 0–1. Corta o ruído do dedo esticado e o fim do gatilho do controle.")]
+    [Tooltip("Controle: faixa do gatilho analógico que vira curso 0–1. Corta o ruído no começo e o fim do gatilho.")]
     [SerializeField]
     private Vector2 _inputRange = new Vector2(0.05f, 0.95f);
+
+    [Tooltip("Hand tracking: faixa da curvatura do indicador que vira curso 0–1. Meio dedo dobrado já leva o gatilho ao fim.")]
+    [SerializeField]
+    private Vector2 _handInputRange = new Vector2(0.15f, 0.55f);
 
     [Tooltip("Velocidade do gatilho, em cursos por segundo. O retorno pela mola usa a mesma.")]
     [SerializeField, Min(0.1f)]
@@ -49,6 +60,10 @@ public class GlockTrigger : MonoBehaviour
     [Tooltip("Ponto do curso em que o percussor solta.")]
     [SerializeField, Range(0f, 1f)]
     private float _breakPoint = 0.9f;
+
+    [Tooltip("Ponto do curso até onde o gatilho precisa voltar (reset) antes de poder disparar de novo.")]
+    [SerializeField, Range(0f, 1f)]
+    private float _resetPoint = 0.6f;
 
     [SerializeField]
     private bool _startCocked = true;
@@ -66,23 +81,33 @@ public class GlockTrigger : MonoBehaviour
 
     private Quaternion _triggerRest;
     private Quaternion _safetyRest;
+    private bool _dead;
+    private bool _reset = true;
 
     protected virtual void Awake()
     {
         _triggerRest = _triggerPivot.localRotation;
         _safetyRest = _safetyPivot.localRotation;
         IsCocked = _startCocked;
+        _dead = !_startCocked;
     }
 
     protected virtual void Update()
     {
-        // Com o percussor solto, o gatilho fica atrás até o ferrolho ser manobrado.
-        float target = IsCocked ? ReadInput() : 1f;
+        // Gatilho morto fica atrás até o ferrolho recuar o bastante (ResetTrigger).
+        float target = _dead ? 1f : ReadInput();
         Pull = Mathf.MoveTowards(Pull, target, _speed * Time.deltaTime);
+        if (Pull <= _resetPoint)
+        {
+            _reset = true;
+        }
 
-        if (IsCocked && Pull >= _breakPoint)
+        bool inBattery = _slide == null || _slide.Travel01 <= 0.01f;
+        if (IsCocked && _reset && inBattery && Pull >= _breakPoint)
         {
             IsCocked = false;
+            _dead = true;
+            _reset = false;
             WhenStrikerReleased();
         }
 
@@ -92,7 +117,16 @@ public class GlockTrigger : MonoBehaviour
         _triggerPivot.localRotation = _triggerRest * Quaternion.Euler(trigger * _triggerAngle, 0f, 0f);
     }
 
-    /// <summary>Arma o percussor. Chamado pelo <see cref="GlockSlide"/> quando o ferrolho é manobrado.</summary>
+    /// <summary>
+    /// Solta o gatilho morto para a frente. Chamado pelo <see cref="GlockSlide"/> quando o ferrolho
+    /// recua o bastante; o percussor continua solto até o ferrolho voltar.
+    /// </summary>
+    public void ResetTrigger()
+    {
+        _dead = false;
+    }
+
+    /// <summary>Arma o percussor. Chamado pelo <see cref="GlockSlide"/> quando o ferrolho volta à bateria depois de manobrado.</summary>
     public void Cock()
     {
         if (IsCocked)
@@ -112,9 +146,11 @@ public class GlockTrigger : MonoBehaviour
             return 0f;
         }
 
-        // No controle, a força do indicador é o gatilho analógico (ControllerPinchAPI do SDK).
+        // No controle, a força do indicador é o gatilho analógico (ControllerPinchAPI do SDK); no
+        // hand tracking, a curvatura do indicador, que precisa de uma faixa própria, mais curta.
         float strength = interactor.HandGrabApi.GetFingerPalmStrength(HandFinger.Index);
-        return Mathf.InverseLerp(_inputRange.x, _inputRange.y, strength);
+        Vector2 range = interactor.GetComponent<IController>() != null ? _inputRange : _handInputRange;
+        return Mathf.InverseLerp(range.x, range.y, strength);
     }
 
     private HandGrabInteractor HandleInteractor()

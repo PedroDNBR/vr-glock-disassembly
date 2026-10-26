@@ -685,11 +685,14 @@ MonoBehaviour:
   _exitTravel: 0.12
   _ejectSpeed: 0.3
   _seatTolerance: 0.003
-  _autoSeatInsertion: 0.65
+  _autoSeatInsertion: 0.55
   _autoSeatSpeed: 0.8
   _captureRadius: 0.015
   _captureDepth: 0.02
   _captureAngle: 25
+  _touchBox:
+    m_Center: {x: -0.019, y: 0.08, z: -0.0365}
+    m_Extent: {x: 0.007, y: 0.008, z: 0.0085}
   _buttonTravel: {x: 0.0015, y: 0, z: 0}
 --- !u!114 &2881951754846409802
 MonoBehaviour:
@@ -3863,6 +3866,8 @@ GameObject:
   - component: {fileID: 1320330391134214204}
   - component: {fileID: 7180726761610180018}
   - component: {fileID: 6832471590900202965}
+  - component: {fileID: 7562537764274231365}
+  - component: {fileID: 3681309476440175251}
   m_Layer: 0
   m_Name: Glock
   m_TagString: Untagged
@@ -4044,12 +4049,15 @@ MonoBehaviour:
   _grip: {fileID: 6333158740517992089}
   _triggerPivot: {fileID: 2006505979067981611}
   _safetyPivot: {fileID: 3610778860396457200}
+  _slide: {fileID: 7180726761610180018}
   _triggerAngle: 12
   _safetyAngle: 10
   _safetyTravel: 0.15
   _inputRange: {x: 0.05, y: 0.95}
+  _handInputRange: {x: 0.15, y: 0.55}
   _speed: 12
   _breakPoint: 0.9
+  _resetPoint: 0.6
   _startCocked: 1
 --- !u!114 &7180726761610180018
 MonoBehaviour:
@@ -4072,6 +4080,7 @@ MonoBehaviour:
   _travel: 0.045
   _springAcceleration: 25
   _rackThreshold: 0.8
+  _triggerResetTravel: 0.01
   _batteryTolerance: 0.001
   _takedownTravel: 0.008
   _takedownControl: 0
@@ -4098,7 +4107,55 @@ MonoBehaviour:
   _releaseTravel: 0.98
   _raisedAngle: 4
   _leverSpeed: 20
+  _touchBox:
+    m_Center: {x: 0.021, y: 0.11, z: -0.037}
+    m_Extent: {x: 0.009, y: 0.01, z: 0.012}
   _emptyMagazineInserted: 1
+--- !u!114 &7562537764274231365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7956342098172198959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6af4ec3706a889945aad694a10016eb6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockSlideLinkage
+  _slide: {fileID: 7180726761610180018}
+  _barrel: {fileID: 8790549384912858187}
+  _outerSleeve: {fileID: 4232549765497819430}
+  _innerSpring: {fileID: 2358503032279498813}
+  _lockedTravel: 0.003
+  _barrelTravel: 0.0055
+  _tiltAngle: 2
+  _tiltPivot: {x: 0, y: 0, z: 0.096}
+  _innerSpringLength: 0.0819
+--- !u!114 &3681309476440175251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7956342098172198959}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f3c423dada83f6489b91aec1a936a53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlockTakedownLever
+  _grip: {fileID: 6333158740517992089}
+  _slide: {fileID: 7180726761610180018}
+  _lever: {fileID: 4135255906311702338}
+  _travel: 0.0025
+  _requiredSlideOffset: 0.002
+  _downThreshold: 0.9
+  _speed: 10
+  _inputRange: {x: 0.05, y: 0.95}
+  _handInputRange: {x: 0.15, y: 0.55}
+  _touchBox:
+    m_Center: {x: 0.018, y: 0.106, z: 0.0042}
+    m_Extent: {x: 0.008, y: 0.007, z: 0.008}
 --- !u!1 &8005607179420523609
 GameObject:
   m_ObjectHideFlags: 0

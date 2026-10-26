@@ -34,6 +34,10 @@ public class GlockGripDebugLabel : MonoBehaviour
     [SerializeField]
     private GlockMagazine _magazine;
 
+    [Tooltip("Opcional: mostra o curso da alavanca de desmontagem.")]
+    [SerializeField]
+    private GlockTakedownLever _lever;
+
     private int _racks;
 
     protected virtual void OnEnable()
@@ -97,6 +101,11 @@ public class GlockGripDebugLabel : MonoBehaviour
         {
             text += "\nCarregador " + (_magazine.State == GlockMagazine.MagazineState.Seated ? "inserido"
                 : _magazine.State == GlockMagazine.MagazineState.InWell ? "no poço" : "fora");
+        }
+
+        if (_lever != null)
+        {
+            text += "  | alavanca " + _lever.Down01.ToString("F2") + (_lever.IsDown ? " (abaixada)" : "");
         }
 
         _text.text = text;
