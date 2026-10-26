@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/B2_TestRig.unity
     guid: 5897dd897dbecf1459dabbfa298909a0
+  - enabled: 1
+    path: Assets/_Project/Scenes/BackgroundIndoor.unity
+    guid: 9466d622521b99e4680018a79befbfb8
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

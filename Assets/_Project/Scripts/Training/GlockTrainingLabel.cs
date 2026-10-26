@@ -1,9 +1,10 @@
+using TMPro;
 using UnityEngine;
 
 /// <summary>
 /// Texto simples da etapa atual e dos avisos de erro. Provisório até o feedback da E3.
 /// </summary>
-[RequireComponent(typeof(TextMesh))]
+[RequireComponent(typeof(TMP_Text))]
 public class GlockTrainingLabel : MonoBehaviour
 {
     [SerializeField]
@@ -13,13 +14,13 @@ public class GlockTrainingLabel : MonoBehaviour
     [SerializeField, Min(0f)]
     private float _mistakeDuration = 3f;
 
-    private TextMesh _text;
+    private TMP_Text _text;
     private string _mistake;
     private float _mistakeUntil;
 
     protected virtual void Awake()
     {
-        _text = GetComponent<TextMesh>();
+        _text = GetComponent<TMP_Text>();
     }
 
     protected virtual void OnEnable()

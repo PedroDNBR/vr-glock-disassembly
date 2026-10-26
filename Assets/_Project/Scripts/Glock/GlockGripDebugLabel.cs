@@ -1,18 +1,23 @@
 using Oculus.Interaction.GrabAPI;
 using Oculus.Interaction.HandGrab;
 using Oculus.Interaction.Input;
+using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Texto de depuração que flutua sobre a Glock com o modo de pegada de cada mão, a zona que a
-/// mão pegaria agora, o ângulo da mão em relação a uma zona escolhida e a força da pegada de
-/// palma dos dedos. Só para cenas de teste.
+/// Texto de depuração que flutua sobre a Glock com o modo de pegada de cada mão e o estado das peças.
+/// Com <see cref="_details"/>, também a zona que a mão pegaria agora, o ângulo da mão em relação a uma
+/// zona escolhida e a força da pegada de palma dos dedos. Só para cenas de teste.
 /// </summary>
-[RequireComponent(typeof(TextMesh))]
+[RequireComponent(typeof(TMP_Text))]
 public class GlockGripDebugLabel : MonoBehaviour
 {
     [SerializeField]
     private GlockGripController _controller;
+
+    [Tooltip("Mostra também a zona mirada, o ângulo da mão e a força dos dedos (para ajustar a pegada).")]
+    [SerializeField]
+    private bool _details;
 
     [Tooltip("Zona cujo ângulo de aceitação (palma ou dedos) é mostrado, ex.: a de desmontagem.")]
     [SerializeField]
@@ -64,11 +69,11 @@ public class GlockGripDebugLabel : MonoBehaviour
     [SerializeField]
     private Vector3 _offset = new Vector3(0f, 0.25f, 0f);
 
-    private TextMesh _text;
+    private TMP_Text _text;
 
     protected virtual void Awake()
     {
-        _text = GetComponent<TextMesh>();
+        _text = GetComponent<TMP_Text>();
     }
 
     protected virtual void LateUpdate()
@@ -115,6 +120,11 @@ public class GlockGripDebugLabel : MonoBehaviour
     private string Line(Handedness hand, string label)
     {
         string line = label + ": " + _controller.GetMode(hand);
+        if (!_details)
+        {
+            return line;
+        }
+
         HandGrabInteractor interactor = _controller.GetInteractor(hand);
         if (interactor == null)
         {

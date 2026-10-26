@@ -427,3 +427,42 @@ Uma de cada vez. Cada tarefa só termina quando o item "Pronto quando" estiver c
 - [ ] **G1. Pegada por contato dos dedos**, com histerese.
 - [ ] **G2. Gesto de empunhadura e snap no cabo.**
 - [ ] **G3. Curso do ferrolho pelo fechamento dos dedos.** Alavanca pela pinça polegar + indicador.
+
+### H — Ambiente e modos VR/MR
+
+- [ ] **H2. Sons.** Montados com `Tools/Glock/Montar sons` (`GlockSoundsSetup`); falta ouvir no Quest.
+  - **`GlockSounds`** (raiz da Glock):
+    - Percussor disparando (dry fire).
+    - Ferrolho chegando ao fim do curso (puxar) e voltando à bateria (soltar, mais alto quanto mais rápido volta).
+    - Carregador soltando, ferrolho saindo da arma.
+    - Mola e cano saindo do ferrolho: o mesmo som, a mola mais aguda. Tocam na fonte do ferrolho.
+  - **`ImpactSound`** (arma, carregador, ferrolho, mola e cano):
+    - Toca o som de queda com o volume pela velocidade do impacto. Tem cooldown, variação de pitch e ignora o primeiro meio segundo (as peças assentando).
+    - Em colisor com **`ImpactSurface`** (a mesa e a caixa de desmuniciamento) toca o som "na mesa"; no resto, o do chão. Só a arma tem som próprio de chão; as outras peças usam o da mesa mais grave.
+  - **Import:** mono, descomprimido ao carregar, Vorbis 70%.
+- [ ] **H3. Caixa de desmuniciamento.** Modelada pelo desenho oficial (`D:\Blender\MilitaryBase\ClearingBox`) e montada com `Tools/Ambiente/Montar caixa de desmuniciamento na cena aberta` (`ClearingBoxSetup`); falta ver no Quest.
+  - **Na cena:** fica à direita do jogador, virada para ele, com colisor de malha e `ImpactSurface`.
+  - **SafeZone:** agora é o vão da caixa, em cima da areia (sem render). O disparo a seco vale apontando para dentro da caixa.
+
+- [ ] **H1. Troca VR/MR.** Montada com `Tools/Modos/Montar troca VR-MR na cena aberta` (`ExperienceModeSetup`), falta testar no Quest.
+  - **`ExperienceModeController`** (objeto `ExperienceMode` na B2_TestRig):
+    - Carrega a `BackgroundIndoor` aditiva uma vez. Ela precisa estar no Build Settings; o setup coloca.
+    - **VR:** liga os objetos que vieram ligados no ambiente e põe a cena do ambiente como ativa, para céu, luz ambiente e fog virem dela. Passthrough desligado.
+    - **MR:** desliga o ambiente inteiro (render, colisores, luzes e volume de pós-processo), liga o `OVRPassthroughLayer` (underlay) do rig e limpa as câmeras com cor transparente.
+    - Listas `VR Only` e `MR Only` para o que só vale num modo. No MR entram o `MR_Floor` (colisor invisível de 20 × 20 m em y = 0) e a `Directional Light` da cena de teste.
+    - Lembra o último modo (`PlayerPrefs`).
+  - **A mesa** (colisor, sem render) fica igual nos dois modos: no VR o ambiente desenha a mesma mesa no mesmo lugar; no MR ela é alinhada com a mesa de verdade (`TableCalibration`).
+  - **`TableCalibration`** (alinhamento da mesa no MR):
+    - Na primeira entrada no MR, ou pelo botão "AJUSTAR MESA" do pulso, aparece uma mesa fantasma (azul, transparente) que segue a mão direita ou o controle direito.
+    - O jogador apoia a palma em cima da mesa real, no meio da borda mais perto dele, com os dedos apontando para o outro lado. Segurar a pinça esquerda, o gatilho esquerdo ou o A por 0,8 s confirma, e a fantasma some.
+    - Quem se move é o rig (só yaw e posição), não a mesa: a arma, as peças e a área segura continuam na mesa virtual.
+    - Voltar para o VR devolve o rig para a pose original, então tudo volta para a mesa do VR. Voltar para o MR reaplica o último alinhamento da sessão.
+    - O `MR_Floor` vai para a altura do chão de verdade (o rig é Floor Level).
+    - O ponto de referência (`TableReference`, filho da mesa) é o meio da borda de cima do lado do rig, calculado pelo setup a partir do BoxCollider.
+    - Altura da palma e do controle acima do tampo e tempo de confirmação ficam no inspector.
+  - **`WristModeToggle`**: botão de poke do ISDK na parte de baixo do pulso esquerdo (lado da palma).
+    - Segue o pulso da mão no hand tracking ou, sem mão, o controle esquerdo.
+    - Só aparece, e só aceita toque, com o lado da palma virado para a cabeça, com histerese.
+    - Visual: seletor "MODO — VR | MR" de 7 × 4 cm, com a metade do modo atual acesa em laranja e a moldura mudando de cor ao passar e ao apertar o dedo. Posições, ângulos e cores ficam no inspector.
+  - **Sem locomoção:** o `Locomotor` do rig já vinha desligado. Também foram desligados os grupos de teleporte e giro (analógico e microgesto da mão, nos dois lados) e tirado o `TeleportInteractable` do `Ground` do ambiente. Isso evita o analógico esquerdo disputar com a desmontagem e, no MR, não deslocar o mundo em relação à sala real.
+  - **Passthrough:** `Insight Passthrough` = Supported no projeto e `isInsightPassthroughEnabled` ligado no OVRManager. O que mostra ou esconde o passthrough é a camada.

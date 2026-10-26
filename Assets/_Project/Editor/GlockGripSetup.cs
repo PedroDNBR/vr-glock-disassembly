@@ -131,7 +131,7 @@ internal static class GlockGripSetup
     /// Edita o prefab da Glock. Se ele estiver aberto no Prefab Mode, edita lá (e fica para
     /// salvar); senão, abre o asset, edita e salva.
     /// </summary>
-    private static void EditPrefab(System.Action<Transform> edit)
+    internal static void EditPrefab(System.Action<Transform> edit)
     {
         PrefabStage stage = PrefabStageUtility.GetCurrentPrefabStage();
         if (stage != null && stage.assetPath == PrefabPath)
